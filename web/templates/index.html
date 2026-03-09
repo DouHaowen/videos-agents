@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>会议视频分析系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            font-size: 48px;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .header p {
+            font-size: 18px;
+            opacity: 0.9;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            margin-bottom: 30px;
+        }
+        
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 60px 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f8f9ff;
+        }
+        
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: #f0f2ff;
+        }
+        
+        .upload-area.dragover {
+            border-color: #764ba2;
+            background: #e8ebff;
+            transform: scale(1.02);
+        }
+        
+        .upload-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        
+        .upload-text {
+            font-size: 18px;
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .upload-hint {
+            font-size: 14px;
+            color: #999;
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .file-info {
+            display: none;
+            background: #f8f9ff;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        
+        .file-info.show {
+            display: block;
+        }
+        
+        .file-name {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+        
+        .file-size {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .analysis-options {
+            display: none;
+            margin-top: 30px;
+        }
+        
+        .analysis-options.show {
+            display: block;
+        }
+        
+        .option-title {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        
+        .option-buttons {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .option-btn {
+            flex: 1;
+            padding: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+        
+        .option-btn:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+        }
+        
+        .option-btn.selected {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+        
+        .option-btn-icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        
+        .option-btn-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .option-btn-desc {
+            font-size: 13px;
+            color: #666;
+        }
+        
+        .analyze-btn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.3s;
+            display: none;
+        }
+        
+        .analyze-btn.show {
+            display: block;
+        }
+        
+        .analyze-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+        
+        .analyze-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .progress {
+            display: none;
+            margin-top: 30px;
+        }
+        
+        .progress.show {
+            display: block;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .progress-text {
+            text-align: center;
+            color: #667eea;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        
+        .results {
+            display: none;
+        }
+        
+        .results.show {
+            display: block;
+        }
+        
+        .result-summary {
+            background: #f8f9ff;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .result-title {
+            font-size: 18px;
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+        
+        .result-content {
+            color: #555;
+            line-height: 1.8;
+        }
+        
+        .result-meta {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+        
+        .meta-item {
+            background: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .action-btn {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .action-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .action-btn.primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+        }
+        
+        .action-btn.primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 会议视频分析</h1>
+            <p>AI 驱动的智能会议分析工具</p>
+        </div>
+        
+        <div class="card">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📹</div>
+                <div class="upload-text">点击或拖拽上传视频</div>
+                <div class="upload-hint">支持 MP4, MOV, AVI 等格式，最大 500MB</div>
+            </div>
+            <input type="file" id="fileInput" accept="video/*">
+            
+            <div class="file-info" id="fileInfo">
+                <div class="file-name" id="fileName"></div>
+                <div class="file-size" id="fileSize"></div>
+            </div>
+            
+            <div class="analysis-options" id="analysisOptions">
+                <div class="option-title">选择分析模式</div>
+                <div class="option-buttons">
+                    <div class="option-btn selected" data-type="deep">
+                        <div class="option-btn-icon">🔬</div>
+                        <div class="option-btn-title">深度分析</div>
+                        <div class="option-btn-desc">智能分段 + 待办事项 + 纪要</div>
+                    </div>
+                    <div class="option-btn" data-type="quick">
+                        <div class="option-btn-icon">⚡</div>
+                        <div class="option-btn-title">快速分析</div>
+                        <div class="option-btn-desc">基础摘要和讨论点</div>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="analyze-btn" id="analyzeBtn">开始分析</button>
+            
+            <div class="progress" id="progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-text" id="progressText">正在上传视频...</div>
+            </div>
+        </div>
+        
+        <div class="card results" id="results">
+            <div class="result-summary">
+                <div class="result-title">📝 会议摘要</div>
+                <div class="result-content" id="resultSummary"></div>
+                <div class="result-meta" id="resultMeta"></div>
+            </div>
+            
+            <div class="action-buttons">
+                <button class="action-btn primary" id="viewReportBtn">查看完整报告</button>
+                <button class="action-btn" id="downloadMarkdownBtn">下载纪要</button>
+                <button class="action-btn" id="analyzeNewBtn">分析新视频</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let selectedFile = null;
+        let selectedType = 'deep';
+        let currentSessionId = null;
+        
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const analysisOptions = document.getElementById('analysisOptions');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const progress = document.getElementById('progress');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const results = document.getElementById('results');
+        
+        // 上传区域点击
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        // 文件选择
+        fileInput.addEventListener('change', (e) => {
+            handleFile(e.target.files[0]);
+        });
+        
+        // 拖拽上传
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            handleFile(e.dataTransfer.files[0]);
+        });
+        
+        // 处理文件
+        function handleFile(file) {
+            if (!file) return;
+            
+            selectedFile = file;
+            fileName.textContent = `📄 ${file.name}`;
+            fileSize.textContent = `大小: ${(file.size / 1024 / 1024).toFixed(2)} MB`;
+            
+            fileInfo.classList.add('show');
+            analysisOptions.classList.add('show');
+            analyzeBtn.classList.add('show');
+        }
+        
+        // 选择分析模式
+        document.querySelectorAll('.option-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                selectedType = btn.dataset.type;
+            });
+        });
+        
+        // 开始分析
+        analyzeBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+            
+            analyzeBtn.disabled = true;
+            progress.classList.add('show');
+            
+            try {
+                // 上传文件
+                progressText.textContent = '正在上传视频...';
+                progressFill.style.width = '30%';
+                
+                const formData = new FormData();
+                formData.append('video', selectedFile);
+                
+                const uploadRes = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const uploadData = await uploadRes.json();
+                
+                if (!uploadData.success) {
+                    throw new Error(uploadData.error);
+                }
+                
+                // 分析视频
+                progressText.textContent = '正在分析视频...';
+                progressFill.style.width = '60%';
+                
+                const analyzeRes = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        filepath: uploadData.filepath,
+                        type: selectedType
+                    })
+                });
+                
+                const analyzeData = await analyzeRes.json();
+                
+                if (!analyzeData.success) {
+                    throw new Error(analyzeData.error);
+                }
+                
+                progressText.textContent = '分析完成！';
+                progressFill.style.width = '100%';
+                
+                // 显示结果
+                currentSessionId = analyzeData.session_id;
+                showResults(analyzeData);
+                
+            } catch (error) {
+                alert('分析失败: ' + error.message);
+                analyzeBtn.disabled = false;
+                progress.classList.remove('show');
+            }
+        });
+        
+        // 显示结果
+        function showResults(data) {
+            document.getElementById('resultSummary').textContent = data.summary || '无摘要';
+            
+            const meta = document.getElementById('resultMeta');
+            meta.innerHTML = `
+                <div class="meta-item">🏷️ 分类: ${data.category || '未分类'}</div>
+                ${data.segments_count ? `<div class="meta-item">📊 议题数: ${data.segments_count}</div>` : ''}
+                ${data.action_items_count ? `<div class="meta-item">✅ 待办事项: ${data.action_items_count}</div>` : ''}
+            `;
+            
+            results.classList.add('show');
+            progress.classList.remove('show');
+        }
+        
+        // 查看报告
+        document.getElementById('viewReportBtn').addEventListener('click', () => {
+            window.open(`/view/${currentSessionId}`, '_blank');
+        });
+        
+        // 下载纪要
+        document.getElementById('downloadMarkdownBtn').addEventListener('click', () => {
+            window.location.href = `/api/download/${currentSessionId}/markdown`;
+        });
+        
+        // 分析新视频
+        document.getElementById('analyzeNewBtn').addEventListener('click', () => {
+            location.reload();
+        });
+    </script>
+</body>
+</html>

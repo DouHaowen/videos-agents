@@ -4,3 +4,5 @@ anthropic>=0.18.0
 moviepy>=1.0.3
 opencv-python>=4.8.0
 python-dotenv>=1.0.0
+flask>=3.0.0
+reportlab>=4.0.0
