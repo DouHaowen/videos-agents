@@ -41,7 +41,7 @@ def analyze_meeting_deep(video_path):
     
     # 配置 Gemini
     genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-    model = genai.GenerativeModel("gemini-2.0-flash-exp")
+    model = genai.GenerativeModel("gemini-2.0-flash")
     
     # 步骤 1: 上传并基础分析
     print("=" * 60)

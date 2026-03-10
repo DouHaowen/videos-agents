@@ -14,7 +14,7 @@ class GeminiAnalyzer(VideoAnalyzer):
         super().__init__(api_key)
         self.model_name = "Gemini 2.0 Flash"
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel("gemini-2.0-flash-exp")
+        self.model = genai.GenerativeModel("gemini-2.0-flash")
     
     def analyze_video(self, video_path, output_dir):
         start_time = time.time()

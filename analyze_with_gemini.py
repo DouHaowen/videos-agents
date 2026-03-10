@@ -100,7 +100,7 @@ def main():
     
     # 配置 Gemini
     genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-    model = genai.GenerativeModel("gemini-2.0-flash-exp")
+    model = genai.GenerativeModel("gemini-2.0-flash")
     
     # 上传并分析视频
     video_file = upload_video(video_path, genai)

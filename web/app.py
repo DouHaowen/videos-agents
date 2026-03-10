@@ -153,7 +153,7 @@ def create_app():
         session_dir = app.config['OUTPUT_FOLDER'] / session_id
         session_dir.mkdir(exist_ok=True)
         
-        model = genai.GenerativeModel("gemini-2.0-flash-exp")
+        model = genai.GenerativeModel("gemini-2.0-flash")
         
         # 上传视频
         video_file = genai.upload_file(path=filepath)
@@ -256,7 +256,7 @@ def create_app():
         session_dir = app.config['OUTPUT_FOLDER'] / session_id
         session_dir.mkdir(exist_ok=True)
         
-        model = genai.GenerativeModel("gemini-2.0-flash-exp")
+        model = genai.GenerativeModel("gemini-2.0-flash")
         video_file = genai.upload_file(path=filepath)
         
         import time
