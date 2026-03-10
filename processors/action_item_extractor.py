@@ -1,108 +1,95 @@
 """
 待办事项提取器
-从会议内容中自动识别和提取行动项
+支持长会议分块和结构化发言输入。
 """
 
-import json
-from typing import List, Dict
+from typing import Dict, List
+
+import google.generativeai as genai
+
+from .llm_utils import chunk_text, merge_unique_dicts, parse_json_response
 
 
 class ActionItemExtractor:
-    """待办事项提取器"""
-    
+    """待办事项提取器。"""
+
     def __init__(self, client):
-        """
-        初始化提取器
-        
-        Args:
-            client: AI 客户端
-        """
         self.client = client
-    
+
     def extract_action_items(
         self,
         transcript: str,
-        segments: List[Dict] = None
+        segments: List[Dict] = None,
+        utterances: List[Dict] = None,
     ) -> List[Dict]:
-        """
-        从会议内容中提取待办事项
-        
-        Args:
-            transcript: 会议转录文本
-            segments: 分段信息（可选，用于更精确的提取）
-        
-        Returns:
-            待办事项列表，每项包含：
-            {
-                "task": str,           # 任务描述
-                "owner": str,          # 负责人
-                "deadline": str,       # 截止日期
-                "priority": str,       # 优先级（高/中/低）
-                "context": str,        # 上下文（来自哪个议题）
-                "status": str          # 状态（待开始）
-            }
-        """
-        prompt = f"""请从以下会议内容中提取所有的待办事项（Action Items）。
+        segments = segments or []
+        utterances = utterances or []
+        source_text = self._build_source_text(transcript, utterances)
 
-会议内容：
-{transcript[:4000]}  # 限制长度
+        aggregated: List[Dict] = []
+        for chunk in chunk_text(source_text, max_chars=7000, overlap=800):
+            prompt = f"""请从以下会议记录中提取所有待办事项。
 
-请识别以下类型的待办事项：
-1. 明确提到的任务分配（"XX负责做YY"）
-2. 需要跟进的事项（"需要调查/研究/确认..."）
-3. 决策后的执行项（"决定做XX，由YY负责"）
-4. 会议中承诺的交付物
+会议记录：
+{chunk}
 
-对于每个待办事项，请提取：
-- task: 任务描述（清晰、可执行）
-- owner: 负责人（如果提到了名字，否则标记为"待分配"）
-- deadline: 截止日期（如果提到了，否则标记为"待定"）
-- priority: 优先级（根据讨论的紧急程度判断：高/中/低）
-- context: 这个任务来自哪个议题或讨论
+如有议题信息，可参考：
+{segments[:8]}
 
-请以 JSON 格式返回：
+请返回 JSON：
 {{
   "action_items": [
     {{
       "task": "任务描述",
       "owner": "负责人",
-      "deadline": "截止日期",
-      "priority": "优先级",
-      "context": "上下文"
+      "deadline": "截止日期或待定",
+      "priority": "高/中/低",
+      "context": "来自哪个议题",
+      "source_speaker": "谁提出或负责",
+      "status": "待开始"
     }}
   ]
 }}
 
-注意：
-- 只提取明确的、可执行的任务
-- 如果没有待办事项，返回空列表
-- 任务描述要具体，避免模糊
-"""
-        
-        # 调用 LLM
-        if hasattr(self.client, 'chat'):  # OpenAI 风格
-            response = self.client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-                response_format={"type": "json_object"}
-            )
-            result = json.loads(response.choices[0].message.content)
-        else:  # Gemini 风格
-            import google.generativeai as genai
+要求：
+- 只保留明确可执行事项。
+- 如果老板明确布置任务，优先保留。
+- owner 不清楚时填 待分配。"""
+
             response = self.client.generate_content(
                 prompt,
                 generation_config=genai.GenerationConfig(
-                    temperature=0.2,  # 更低的温度以提高准确性
-                    response_mime_type="application/json"
-                )
+                    temperature=0.2,
+                    response_mime_type="application/json",
+                ),
             )
-            result = json.loads(response.text)
-        
-        # 处理结果
-        action_items = result.get("action_items", [])
-        
-        # 添加默认状态
+            data = parse_json_response(response.text)
+            aggregated.extend(data.get("action_items", []))
+
+        action_items = merge_unique_dicts(aggregated, ["task", "owner"])
         for item in action_items:
-            item["status"] = "待开始"
-        
+            item["status"] = item.get("status", "待开始")
+            item["owner"] = item.get("owner") or "待分配"
+            item["deadline"] = item.get("deadline") or "待定"
+            item["priority"] = item.get("priority") or "中"
+            item["context"] = item.get("context") or self._infer_context(item, segments)
+
         return action_items
+
+    def _build_source_text(self, transcript: str, utterances: List[Dict]) -> str:
+        if utterances:
+            return "\n".join(
+                [
+                    f"[{item.get('start_time')}-{item.get('end_time')}] "
+                    f"{item.get('speaker_name', '未知')}/{item.get('role', '未知')}: {item.get('text', '')}"
+                    for item in utterances
+                ]
+            )
+        return transcript
+
+    def _infer_context(self, item: Dict, segments: List[Dict]) -> str:
+        task_text = item.get("task", "").lower()
+        for segment in segments or []:
+            if task_text and task_text[:12] in segment.get("transcript", "").lower():
+                return segment.get("title", "会议讨论")
+        return "会议讨论"

@@ -3,535 +3,939 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>会议视频分析系统</title>
+    <title>会议分析工作台</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
+        * { box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            font-family: "Helvetica Neue", "PingFang SC", sans-serif;
+            color: #102a43;
+            background:
+                radial-gradient(circle at top left, rgba(8,145,178,0.18), transparent 28%),
+                linear-gradient(160deg, #f8fafc 0%, #ecfeff 40%, #f0fdf4 100%);
             min-height: 100vh;
-            padding: 40px 20px;
         }
-        
-        .container {
-            max-width: 900px;
+        .layout {
+            max-width: 1440px;
             margin: 0 auto;
+            padding: 24px 18px 40px;
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            gap: 18px;
         }
-        
-        .header {
-            text-align: center;
-            color: white;
-            margin-bottom: 40px;
+        .panel {
+            background: rgba(255,255,255,0.88);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(148,163,184,0.18);
+            border-radius: 28px;
+            box-shadow: 0 20px 60px rgba(15,23,42,0.08);
         }
-        
-        .header h1 {
-            font-size: 48px;
-            margin-bottom: 10px;
-            font-weight: 700;
+        .sidebar {
+            padding: 22px;
+            position: sticky;
+            top: 18px;
+            height: calc(100vh - 36px);
+            overflow: auto;
         }
-        
-        .header p {
-            font-size: 18px;
-            opacity: 0.9;
+        .content {
+            display: grid;
+            gap: 18px;
         }
-        
-        .card {
-            background: white;
-            border-radius: 20px;
-            padding: 40px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            margin-bottom: 30px;
-        }
-        
-        .upload-area {
-            border: 3px dashed #667eea;
-            border-radius: 15px;
-            padding: 60px 40px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s;
-            background: #f8f9ff;
-        }
-        
-        .upload-area:hover {
-            border-color: #764ba2;
-            background: #f0f2ff;
-        }
-        
-        .upload-area.dragover {
-            border-color: #764ba2;
-            background: #e8ebff;
-            transform: scale(1.02);
-        }
-        
-        .upload-icon {
-            font-size: 64px;
-            margin-bottom: 20px;
-        }
-        
-        .upload-text {
-            font-size: 18px;
-            color: #667eea;
-            font-weight: 600;
-            margin-bottom: 10px;
-        }
-        
-        .upload-hint {
-            font-size: 14px;
-            color: #999;
-        }
-        
-        #fileInput {
-            display: none;
-        }
-        
-        .file-info {
-            display: none;
-            background: #f8f9ff;
-            padding: 20px;
-            border-radius: 10px;
-            margin-top: 20px;
-        }
-        
-        .file-info.show {
-            display: block;
-        }
-        
-        .file-name {
-            font-size: 16px;
-            color: #333;
-            margin-bottom: 10px;
-            font-weight: 500;
-        }
-        
-        .file-size {
-            font-size: 14px;
-            color: #666;
-        }
-        
-        .analysis-options {
-            display: none;
-            margin-top: 30px;
-        }
-        
-        .analysis-options.show {
-            display: block;
-        }
-        
-        .option-title {
-            font-size: 18px;
-            color: #333;
-            margin-bottom: 15px;
-            font-weight: 600;
-        }
-        
-        .option-buttons {
+        .view-switch {
             display: flex;
-            gap: 15px;
+            gap: 10px;
+            padding: 8px;
+            background: rgba(255,255,255,0.72);
+            border-radius: 20px;
+            width: fit-content;
         }
-        
-        .option-btn {
-            flex: 1;
-            padding: 20px;
-            border: 2px solid #e0e0e0;
-            border-radius: 12px;
-            background: white;
-            cursor: pointer;
-            transition: all 0.3s;
-            text-align: center;
-        }
-        
-        .option-btn:hover {
-            border-color: #667eea;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
-        }
-        
-        .option-btn.selected {
-            border-color: #667eea;
-            background: #f8f9ff;
-        }
-        
-        .option-btn-icon {
-            font-size: 32px;
-            margin-bottom: 10px;
-        }
-        
-        .option-btn-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 5px;
-        }
-        
-        .option-btn-desc {
-            font-size: 13px;
-            color: #666;
-        }
-        
-        .analyze-btn {
-            width: 100%;
-            padding: 18px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+        .view-btn {
             border: none;
-            border-radius: 12px;
-            font-size: 18px;
-            font-weight: 600;
+            border-radius: 14px;
+            padding: 12px 18px;
+            font-size: 14px;
+            font-weight: 700;
             cursor: pointer;
-            margin-top: 20px;
-            transition: all 0.3s;
-            display: none;
+            background: transparent;
+            color: #334155;
         }
-        
-        .analyze-btn.show {
-            display: block;
+        .view-btn.active {
+            background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+            color: white;
         }
-        
-        .analyze-btn:hover {
+        .view-panel { display: none; }
+        .view-panel.active { display: grid; gap: 18px; }
+        h1, h2, h3, h4 { margin: 0; }
+        .hero {
+            padding: 24px;
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 18px;
+        }
+        .card { padding: 24px; }
+        .muted { color: #5b7083; line-height: 1.7; }
+        .upload-area {
+            border: 2px dashed #0f766e;
+            border-radius: 22px;
+            background: #f0fdfa;
+            padding: 34px 18px;
+            text-align: center;
+            cursor: pointer;
+            transition: transform .2s ease, border-color .2s ease;
+        }
+        .upload-area:hover, .upload-area.dragover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+            border-color: #115e59;
         }
-        
-        .analyze-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
+        #fileInput { display: none; }
+        .option-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 16px;
         }
-        
-        .progress {
-            display: none;
-            margin-top: 30px;
+        .option-btn {
+            border: 1px solid #cbd5e1;
+            border-radius: 16px;
+            background: white;
+            padding: 14px;
+            cursor: pointer;
+            transition: border-color .2s ease, background .2s ease;
         }
-        
-        .progress.show {
-            display: block;
+        .option-btn.selected {
+            border-color: #0f766e;
+            background: #ecfeff;
         }
-        
-        .progress-bar {
+        .primary-btn, .secondary-btn, .ghost-btn {
+            border: none;
+            border-radius: 14px;
+            padding: 13px 16px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .primary-btn {
             width: 100%;
-            height: 8px;
-            background: #e0e0e0;
-            border-radius: 4px;
-            overflow: hidden;
-            margin-bottom: 15px;
+            color: white;
+            background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+            margin-top: 16px;
         }
-        
+        .primary-btn:disabled { opacity: .6; cursor: not-allowed; }
+        .secondary-btn { background: #ecfeff; color: #115e59; }
+        .ghost-btn { background: #f8fafc; color: #334155; }
+        .progress { display: none; margin-top: 16px; }
+        .progress.show { display: block; }
+        .progress-bar {
+            height: 10px;
+            background: #dbeafe;
+            border-radius: 999px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
             width: 0%;
-            transition: width 0.3s;
-            animation: pulse 1.5s infinite;
+            background: linear-gradient(90deg, #14b8a6 0%, #0f766e 100%);
+            transition: width .3s ease;
         }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
+        .history-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
         }
-        
-        .progress-text {
-            text-align: center;
-            color: #667eea;
-            font-weight: 600;
-            font-size: 16px;
+        .history-list {
+            display: grid;
+            gap: 10px;
         }
-        
-        .results {
-            display: none;
+        .history-item {
+            background: #f8fafc;
+            border: 1px solid transparent;
+            border-radius: 16px;
+            padding: 14px;
+            cursor: pointer;
+            transition: border-color .2s ease, transform .2s ease;
         }
-        
-        .results.show {
-            display: block;
+        .history-item-head {
+            display: flex;
+            gap: 8px;
+            align-items: start;
+            justify-content: space-between;
         }
-        
-        .result-summary {
-            background: #f8f9ff;
-            padding: 25px;
-            border-radius: 12px;
-            margin-bottom: 20px;
+        .history-item:hover, .history-item.active {
+            border-color: #14b8a6;
+            transform: translateY(-1px);
         }
-        
-        .result-title {
-            font-size: 18px;
-            color: #667eea;
-            font-weight: 600;
-            margin-bottom: 15px;
+        .history-title {
+            font-weight: 700;
+            margin-bottom: 6px;
         }
-        
-        .result-content {
-            color: #555;
+        .history-meta {
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 6px;
+        }
+        .history-summary {
+            font-size: 13px;
+            color: #475569;
+            line-height: 1.5;
+        }
+        .danger-btn {
+            border: none;
+            background: #fee2e2;
+            color: #991b1b;
+            border-radius: 10px;
+            padding: 6px 10px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .summary-grid, .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 18px;
+        }
+        .summary-card, .detail-card {
+            padding: 22px;
+        }
+        .pill-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 14px;
+        }
+        .pill {
+            background: #ecfeff;
+            color: #115e59;
+            border-radius: 999px;
+            padding: 7px 11px;
+            font-size: 13px;
+        }
+        .list, .timeline-list {
+            margin: 0;
+            padding-left: 18px;
             line-height: 1.8;
         }
-        
-        .result-meta {
+        .section-stack {
+            display: grid;
+            gap: 14px;
+        }
+        .mini-card {
+            background: #f8fafc;
+            border-radius: 16px;
+            padding: 14px;
+        }
+        .mini-title {
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+        .actions {
             display: flex;
-            gap: 20px;
             flex-wrap: wrap;
-            margin-top: 15px;
+            gap: 10px;
+            margin-top: 14px;
         }
-        
-        .meta-item {
-            background: white;
-            padding: 10px 15px;
-            border-radius: 8px;
-            font-size: 14px;
-            color: #666;
-        }
-        
-        .action-buttons {
+        .tab-row {
             display: flex;
-            gap: 15px;
-            margin-top: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 12px;
         }
-        
-        .action-btn {
-            flex: 1;
-            padding: 15px;
-            border: 2px solid #667eea;
+        .tab-btn {
+            border: 1px solid #cbd5e1;
+            border-radius: 999px;
             background: white;
-            color: #667eea;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
+            padding: 9px 14px;
             cursor: pointer;
-            transition: all 0.3s;
+            font-size: 13px;
+            font-weight: 700;
         }
-        
-        .action-btn:hover {
-            background: #667eea;
+        .tab-btn.active {
+            background: #0f766e;
             color: white;
+            border-color: #0f766e;
         }
-        
-        .action-btn.primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+        .timeline-entry {
+            border-left: 4px solid #14b8a6;
+            background: #f8fafc;
+            border-radius: 14px;
+            padding: 14px;
+            margin-bottom: 12px;
         }
-        
-        .action-btn.primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        .iframe-wrap {
+            border-radius: 18px;
+            overflow: hidden;
+            border: 1px solid #dbeafe;
+            height: 720px;
+        }
+        .task-center-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 18px;
+        }
+        .task-memory-card {
+            border: 1px solid #dbeafe;
+            border-radius: 18px;
+            padding: 16px;
+            background: #f8fafc;
+            margin-bottom: 12px;
+        }
+        .task-memory-head {
+            display: flex;
+            gap: 10px;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .status-badge {
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-size: 12px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .status-open { background: #dbeafe; color: #1d4ed8; }
+        .status-in_progress { background: #fef3c7; color: #b45309; }
+        .status-completed { background: #dcfce7; color: #166534; }
+        .status-blocked { background: #fee2e2; color: #b91c1c; }
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .meta-chip {
+            background: white;
+            border-radius: 12px;
+            padding: 10px 12px;
+            font-size: 13px;
+            color: #334155;
+        }
+        .stat-card {
+            background: #f8fafc;
+            border-radius: 16px;
+            padding: 16px;
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: 0;
+            background: white;
+        }
+        .empty {
+            padding: 26px;
+            text-align: center;
+            color: #64748b;
+        }
+        @media (max-width: 1100px) {
+            .layout { grid-template-columns: 1fr; }
+            .sidebar { position: static; height: auto; }
+            .hero, .summary-grid, .detail-grid { grid-template-columns: 1fr; }
+            .task-center-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🎬 会议视频分析</h1>
-            <p>AI 驱动的智能会议分析工具</p>
-        </div>
-        
-        <div class="card">
-            <div class="upload-area" id="uploadArea">
-                <div class="upload-icon">📹</div>
-                <div class="upload-text">点击或拖拽上传视频</div>
-                <div class="upload-hint">支持 MP4, MOV, AVI 等格式，最大 500MB</div>
+    <div class="layout">
+        <aside class="panel sidebar">
+            <div class="history-head">
+                <div>
+                    <h2>历史记录</h2>
+                    <div class="muted" style="font-size: 13px;">每次分析都会保留下来，可随时回看。</div>
+                </div>
+                <button class="ghost-btn" id="refreshHistoryBtn">刷新</button>
             </div>
-            <input type="file" id="fileInput" accept="video/*">
-            
-            <div class="file-info" id="fileInfo">
-                <div class="file-name" id="fileName"></div>
-                <div class="file-size" id="fileSize"></div>
-            </div>
-            
-            <div class="analysis-options" id="analysisOptions">
-                <div class="option-title">选择分析模式</div>
-                <div class="option-buttons">
-                    <div class="option-btn selected" data-type="deep">
-                        <div class="option-btn-icon">🔬</div>
-                        <div class="option-btn-title">深度分析</div>
-                        <div class="option-btn-desc">智能分段 + 待办事项 + 纪要</div>
-                    </div>
-                    <div class="option-btn" data-type="quick">
-                        <div class="option-btn-icon">⚡</div>
-                        <div class="option-btn-title">快速分析</div>
-                        <div class="option-btn-desc">基础摘要和讨论点</div>
+            <div class="history-list" id="historyList"></div>
+        </aside>
+
+        <main class="content">
+            <section class="panel hero">
+                <div class="card">
+                    <h1>会议分析工作台</h1>
+                    <p class="muted">所有分析、查看、回看、下载都在同一套页面里完成。不会再跳去一个割裂的独立结果页。</p>
+                    <div class="pill-row">
+                        <div class="pill">页内联动查看</div>
+                        <div class="pill">自动沉淀历史记录</div>
+                        <div class="pill">支持结构化转录下载</div>
                     </div>
                 </div>
-            </div>
-            
-            <button class="analyze-btn" id="analyzeBtn">开始分析</button>
-            
-            <div class="progress" id="progress">
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progressFill"></div>
+                <div class="card">
+                    <div class="upload-area" id="uploadArea">
+                        <div style="font-size: 50px;">🎥</div>
+                        <h3 style="margin-top: 8px;">上传会议视频</h3>
+                        <div class="muted">支持 MP4 / MOV / AVI，最大 500MB</div>
+                    </div>
+                    <input type="file" id="fileInput" accept="video/*">
+                    <div id="fileInfo" style="margin-top:12px; display:none;">
+                        <div class="mini-title" id="fileName"></div>
+                        <div class="muted" id="fileSize"></div>
+                    </div>
+                    <div class="option-row" style="grid-template-columns: 1fr;">
+                        <button class="option-btn selected" data-type="complete">
+                            <strong>完整分析</strong>
+                            <div class="muted" style="font-size:12px;">结构化转录、老板要求、员工汇报、议题、待办、决策、报告、历史沉淀</div>
+                        </button>
+                    </div>
+                    <button class="primary-btn" id="analyzeBtn">开始分析</button>
+                    <div class="progress" id="progress">
+                        <div class="muted" id="progressText">准备开始...</div>
+                        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+                    </div>
                 </div>
-                <div class="progress-text" id="progressText">正在上传视频...</div>
+            </section>
+
+            <section class="panel card" style="padding: 14px 18px;">
+                <div class="view-switch">
+                    <button class="view-btn active" data-view="workspace">会议工作台</button>
+                    <button class="view-btn" data-view="tasks">全局任务中心</button>
+                </div>
+            </section>
+
+            <div class="view-panel active" id="view-workspace">
+            <section class="summary-grid">
+                <div class="panel summary-card">
+                    <h2 id="resultTitle">当前结果</h2>
+                    <p class="muted" id="resultSummary">还没有加载任何会议结果。你可以上传视频开始分析，或者从左侧历史记录中选择一个会话。</p>
+                    <div class="pill-row" id="resultMeta"></div>
+                    <div class="actions">
+                        <button class="secondary-btn" id="downloadMarkdownBtn">下载纪要</button>
+                        <button class="secondary-btn" id="downloadPdfBtn">下载 PDF</button>
+                        <button class="secondary-btn" id="downloadStructuredBtn">下载结构化转录</button>
+                        <button class="ghost-btn" id="deleteCurrentBtn">删除当前历史</button>
+                    </div>
+                </div>
+                <div class="panel summary-card">
+                    <h2>管理视角</h2>
+                    <div class="section-stack">
+                        <div class="mini-card">
+                            <div class="mini-title">老板要求</div>
+                            <ul class="list" id="bossMessages"></ul>
+                        </div>
+                        <div class="mini-card">
+                            <div class="mini-title">风险与阻塞</div>
+                            <ul class="list" id="riskList"></ul>
+                        </div>
+                        <div class="mini-card">
+                            <div class="mini-title">下一步动作</div>
+                            <ul class="list" id="nextStepList"></ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel detail-card">
+                <div class="tab-row">
+                        <button class="tab-btn active" data-tab="overview">员工汇报</button>
+                        <button class="tab-btn" data-tab="timeline">议题时间轴</button>
+                        <button class="tab-btn" data-tab="actions">待办事项</button>
+                        <button class="tab-btn" data-tab="speakers">发言人</button>
+                        <button class="tab-btn" data-tab="decisions">决策</button>
+                        <button class="tab-btn" data-tab="report">完整报告</button>
+                    </div>
+
+                <div class="tab-panel active" id="tab-overview">
+                    <div class="detail-grid">
+                        <div class="mini-card">
+                            <div class="mini-title">员工汇报摘要</div>
+                            <ul class="list" id="employeeUpdates"></ul>
+                        </div>
+                        <div class="mini-card">
+                            <div class="mini-title">参与者</div>
+                            <ul class="list" id="participantList"></ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-panel" id="tab-timeline">
+                    <div id="timelineContainer" class="empty">暂无议题时间轴</div>
+                </div>
+
+                <div class="tab-panel" id="tab-actions">
+                    <div id="actionItemsContainer" class="empty">暂无待办事项</div>
+                </div>
+
+                <div class="tab-panel" id="tab-speakers">
+                    <div id="speakersContainer" class="empty">暂无发言人数据</div>
+                </div>
+
+                <div class="tab-panel" id="tab-decisions">
+                    <div id="decisionsContainer" class="empty">暂无关键决策</div>
+                </div>
+
+                <div class="tab-panel" id="tab-report">
+                    <div class="iframe-wrap">
+                        <iframe id="reportFrame" title="完整报告"></iframe>
+                    </div>
+                </div>
+            </section>
             </div>
-        </div>
-        
-        <div class="card results" id="results">
-            <div class="result-summary">
-                <div class="result-title">📝 会议摘要</div>
-                <div class="result-content" id="resultSummary"></div>
-                <div class="result-meta" id="resultMeta"></div>
-            </div>
-            
-            <div class="action-buttons">
-                <button class="action-btn primary" id="viewReportBtn">查看完整报告</button>
-                <button class="action-btn" id="downloadMarkdownBtn">下载纪要</button>
-                <button class="action-btn" id="analyzeNewBtn">分析新视频</button>
-            </div>
-        </div>
+
+            <section class="panel detail-card view-panel" id="view-tasks">
+                <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start; flex-wrap:wrap;">
+                    <div>
+                        <h2>全局任务中心</h2>
+                        <p class="muted" style="margin-top:8px;">这里汇总所有会议里提出和更新过的任务，重点展示任务来源会议、提出日期、截止时间，以及在哪次会议里被确认完成。</p>
+                    </div>
+                    <button class="ghost-btn" id="refreshMemoryBtn">刷新任务中心</button>
+                </div>
+                <div id="memoryStats" class="pill-row" style="margin-top: 12px;"></div>
+                <div id="memoryStatusSummary" class="summary-grid"></div>
+                <div class="task-center-grid">
+                    <div id="taskMemoryContainer" class="empty">暂无全局任务数据</div>
+                    <div class="section-stack">
+                        <div class="mini-card">
+                            <div class="mini-title">老板要求追踪</div>
+                            <div id="requirementMemoryContainer" class="empty" style="padding:0; text-align:left;">暂无老板要求库数据</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
     </div>
-    
+
     <script>
         let selectedFile = null;
-        let selectedType = 'deep';
+        let selectedType = "complete";
         let currentSessionId = null;
-        
-        const uploadArea = document.getElementById('uploadArea');
-        const fileInput = document.getElementById('fileInput');
-        const fileInfo = document.getElementById('fileInfo');
-        const fileName = document.getElementById('fileName');
-        const fileSize = document.getElementById('fileSize');
-        const analysisOptions = document.getElementById('analysisOptions');
-        const analyzeBtn = document.getElementById('analyzeBtn');
-        const progress = document.getElementById('progress');
-        const progressFill = document.getElementById('progressFill');
-        const progressText = document.getElementById('progressText');
-        const results = document.getElementById('results');
-        
-        // 上传区域点击
-        uploadArea.addEventListener('click', () => fileInput.click());
-        
-        // 文件选择
-        fileInput.addEventListener('change', (e) => {
-            handleFile(e.target.files[0]);
+        let currentView = "workspace";
+
+        const uploadArea = document.getElementById("uploadArea");
+        const fileInput = document.getElementById("fileInput");
+        const analyzeBtn = document.getElementById("analyzeBtn");
+        const progress = document.getElementById("progress");
+        const progressFill = document.getElementById("progressFill");
+        const progressText = document.getElementById("progressText");
+        const historyList = document.getElementById("historyList");
+        let memoryCache = { tasks: [], requirements: [], stats: {} };
+
+        uploadArea.addEventListener("click", () => fileInput.click());
+        fileInput.addEventListener("change", (event) => handleFile(event.target.files[0]));
+        uploadArea.addEventListener("dragover", (event) => {
+            event.preventDefault();
+            uploadArea.classList.add("dragover");
         });
-        
-        // 拖拽上传
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
+        uploadArea.addEventListener("dragleave", () => uploadArea.classList.remove("dragover"));
+        uploadArea.addEventListener("drop", (event) => {
+            event.preventDefault();
+            uploadArea.classList.remove("dragover");
+            handleFile(event.dataTransfer.files[0]);
         });
-        
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
+
+        document.querySelectorAll(".tab-btn").forEach((button) => {
+            button.addEventListener("click", () => switchTab(button.dataset.tab));
         });
-        
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-            handleFile(e.dataTransfer.files[0]);
+        document.querySelectorAll(".view-btn").forEach((button) => {
+            button.addEventListener("click", () => switchView(button.dataset.view));
         });
-        
-        // 处理文件
-        function handleFile(file) {
-            if (!file) return;
-            
-            selectedFile = file;
-            fileName.textContent = `📄 ${file.name}`;
-            fileSize.textContent = `大小: ${(file.size / 1024 / 1024).toFixed(2)} MB`;
-            
-            fileInfo.classList.add('show');
-            analysisOptions.classList.add('show');
-            analyzeBtn.classList.add('show');
-        }
-        
-        // 选择分析模式
-        document.querySelectorAll('.option-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
-                btn.classList.add('selected');
-                selectedType = btn.dataset.type;
-            });
-        });
-        
-        // 开始分析
-        analyzeBtn.addEventListener('click', async () => {
+
+        document.getElementById("refreshHistoryBtn").addEventListener("click", loadHistory);
+        document.getElementById("refreshMemoryBtn").addEventListener("click", loadMemory);
+        document.getElementById("downloadMarkdownBtn").addEventListener("click", () => downloadCurrent("markdown"));
+        document.getElementById("downloadPdfBtn").addEventListener("click", () => downloadCurrent("pdf"));
+        document.getElementById("downloadStructuredBtn").addEventListener("click", () => downloadCurrent("structured"));
+        document.getElementById("deleteCurrentBtn").addEventListener("click", () => deleteHistory(currentSessionId));
+
+        analyzeBtn.addEventListener("click", async () => {
             if (!selectedFile) return;
-            
+
             analyzeBtn.disabled = true;
-            progress.classList.add('show');
-            
+            progress.classList.add("show");
+
             try {
-                // 上传文件
-                progressText.textContent = '正在上传视频...';
-                progressFill.style.width = '30%';
-                
+                progressText.textContent = "正在上传视频...";
+                progressFill.style.width = "22%";
+
                 const formData = new FormData();
-                formData.append('video', selectedFile);
-                
-                const uploadRes = await fetch('/api/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-                
+                formData.append("video", selectedFile);
+                const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
                 const uploadData = await uploadRes.json();
-                
-                if (!uploadData.success) {
-                    throw new Error(uploadData.error);
-                }
-                
-                // 分析视频
-                progressText.textContent = '正在分析视频...';
-                progressFill.style.width = '60%';
-                
-                const analyzeRes = await fetch('/api/analyze', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                if (!uploadData.success) throw new Error(uploadData.error || "上传失败");
+
+                progressText.textContent = "正在执行会议分析，这一步可能需要几分钟...";
+                progressFill.style.width = "70%";
+
+                const analyzeRes = await fetch("/api/analyze", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         filepath: uploadData.filepath,
-                        type: selectedType
+                        type: selectedType,
+                        save_to_db: true
                     })
                 });
-                
                 const analyzeData = await analyzeRes.json();
-                
-                if (!analyzeData.success) {
-                    throw new Error(analyzeData.error);
-                }
-                
-                progressText.textContent = '分析完成！';
-                progressFill.style.width = '100%';
-                
-                // 显示结果
+                if (!analyzeData.success) throw new Error(analyzeData.error || "分析失败");
+
                 currentSessionId = analyzeData.session_id;
-                showResults(analyzeData);
-                
+                progressText.textContent = "分析完成，正在载入完整结果...";
+                progressFill.style.width = "100%";
+                await openHistory(currentSessionId);
+                await loadMemory();
+                await loadHistory();
             } catch (error) {
-                alert('分析失败: ' + error.message);
+                alert("分析失败: " + error.message);
+            } finally {
                 analyzeBtn.disabled = false;
-                progress.classList.remove('show');
+                progress.classList.remove("show");
             }
         });
-        
-        // 显示结果
-        function showResults(data) {
-            document.getElementById('resultSummary').textContent = data.summary || '无摘要';
-            
-            const meta = document.getElementById('resultMeta');
-            meta.innerHTML = `
-                <div class="meta-item">🏷️ 分类: ${data.category || '未分类'}</div>
-                ${data.segments_count ? `<div class="meta-item">📊 议题数: ${data.segments_count}</div>` : ''}
-                ${data.action_items_count ? `<div class="meta-item">✅ 待办事项: ${data.action_items_count}</div>` : ''}
-            `;
-            
-            results.classList.add('show');
-            progress.classList.remove('show');
+
+        function handleFile(file) {
+            if (!file) return;
+            selectedFile = file;
+            document.getElementById("fileInfo").style.display = "block";
+            document.getElementById("fileName").textContent = file.name;
+            document.getElementById("fileSize").textContent = `大小: ${(file.size / 1024 / 1024).toFixed(2)} MB`;
         }
-        
-        // 查看报告
-        document.getElementById('viewReportBtn').addEventListener('click', () => {
-            window.open(`/view/${currentSessionId}`, '_blank');
-        });
-        
-        // 下载纪要
-        document.getElementById('downloadMarkdownBtn').addEventListener('click', () => {
-            window.location.href = `/api/download/${currentSessionId}/markdown`;
-        });
-        
-        // 分析新视频
-        document.getElementById('analyzeNewBtn').addEventListener('click', () => {
-            location.reload();
-        });
+
+        async function loadHistory() {
+            const res = await fetch("/api/history");
+            const data = await res.json();
+            const items = data.items || [];
+
+            if (!items.length) {
+                historyList.innerHTML = `<div class="empty">还没有历史记录</div>`;
+                return;
+            }
+
+            historyList.innerHTML = items.map((item) => `
+                <div class="history-item ${item.session_id === currentSessionId ? "active" : ""}" data-session-id="${item.session_id}">
+                    <div class="history-item-head">
+                        <div class="history-title">${escapeHtml(item.title || item.session_id)}</div>
+                        <button class="danger-btn" data-delete-session-id="${item.session_id}">删除</button>
+                    </div>
+                    <div class="history-meta">${escapeHtml(item.date || "")} · ${escapeHtml(item.category || "未分类")}</div>
+                    <div class="history-summary">${escapeHtml((item.summary || "无摘要").slice(0, 80))}</div>
+                </div>
+            `).join("");
+
+            document.querySelectorAll(".history-item").forEach((node) => {
+                node.addEventListener("click", () => openHistory(node.dataset.sessionId));
+            });
+            document.querySelectorAll("[data-delete-session-id]").forEach((node) => {
+                node.addEventListener("click", (event) => {
+                    event.stopPropagation();
+                    deleteHistory(node.dataset.deleteSessionId);
+                });
+            });
+
+            if (!currentSessionId && items[0]) {
+                await openHistory(items[0].session_id);
+            }
+        }
+
+        async function loadMemory() {
+            const res = await fetch("/api/memory");
+            memoryCache = await res.json();
+            renderMemory();
+        }
+
+        async function openHistory(sessionId) {
+            const res = await fetch(`/api/history/${sessionId}`);
+            const data = await res.json();
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+            currentSessionId = sessionId;
+            renderResults(data);
+            document.querySelectorAll(".history-item").forEach((node) => {
+                node.classList.toggle("active", node.dataset.sessionId === sessionId);
+            });
+        }
+
+        function renderResults(data) {
+            const basic = data.basic_analysis || {};
+            const manager = basic.manager_summary || {};
+
+            document.getElementById("resultTitle").textContent = basic.title || data.summary_card?.title || "会议结果";
+            document.getElementById("resultSummary").textContent = basic.summary || "无摘要";
+            document.getElementById("resultMeta").innerHTML = `
+                <div class="pill">分类: ${escapeHtml(basic.category || "未分类")}</div>
+                <div class="pill">议题数: ${(data.segments || []).length}</div>
+                <div class="pill">待办事项: ${(data.action_items || []).length}</div>
+                <div class="pill">发言人: ${(data.speakers || []).length}</div>
+                <div class="pill">决策点: ${(data.decisions || []).length}</div>
+            `;
+
+            renderList("bossMessages", manager.boss_messages, "未识别到明确老板要求");
+            renderList("riskList", manager.risks, "未识别到明显风险");
+            renderList("nextStepList", manager.next_steps, "未识别到明确下一步");
+            renderObjectList("employeeUpdates", manager.employee_updates, (item) => `<strong>${escapeHtml(item.speaker_name || "未知")} / ${escapeHtml(item.role || "未知")}</strong>：${escapeHtml(item.summary || "无内容")}`, "未识别到员工汇报摘要");
+            renderObjectList("participantList", data.participant_roles || basic.participants, (item) => `${escapeHtml(item.speaker_name || item.speaker_id || "未知")} / ${escapeHtml(item.role || "未知")}${item.is_manager ? " / 管理者" : ""}`, "暂无参与者数据");
+
+            renderTimeline(data.segments || []);
+            renderActionItems(data.action_items || []);
+            renderSpeakers(data.speakers || []);
+            renderDecisions(data.decisions || []);
+            renderMemory();
+            document.getElementById("reportFrame").src = `/view/${data.session_id}`;
+        }
+
+        function renderList(elementId, items, emptyText) {
+            const el = document.getElementById(elementId);
+            if (!items || !items.length) {
+                el.innerHTML = `<li>${emptyText}</li>`;
+                return;
+            }
+            el.innerHTML = items.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+        }
+
+        function renderObjectList(elementId, items, renderer, emptyText) {
+            const el = document.getElementById(elementId);
+            if (!items || !items.length) {
+                el.innerHTML = `<li>${emptyText}</li>`;
+                return;
+            }
+            el.innerHTML = items.map((item) => `<li>${renderer(item)}</li>`).join("");
+        }
+
+        function renderTimeline(segments) {
+            const el = document.getElementById("timelineContainer");
+            if (!segments.length) {
+                el.className = "empty";
+                el.innerHTML = "暂无议题时间轴";
+                return;
+            }
+            el.className = "";
+            el.innerHTML = segments.map((seg) => `
+                <div class="timeline-entry">
+                    <div class="mini-title">${escapeHtml(seg.title || "未命名议题")}</div>
+                    <div class="muted" style="font-size:13px;">${formatTime(seg.start_time)} - ${formatTime(seg.end_time)}</div>
+                    <div style="margin-top:8px;">${escapeHtml(seg.summary || "无摘要")}</div>
+                    <ul class="timeline-list">${(seg.key_points || []).map((point) => `<li>${escapeHtml(point)}</li>`).join("") || "<li>无关键点</li>"}</ul>
+                </div>
+            `).join("");
+        }
+
+        function renderActionItems(items) {
+            const el = document.getElementById("actionItemsContainer");
+            if (!items.length) {
+                el.className = "empty";
+                el.innerHTML = "暂无待办事项";
+                return;
+            }
+            el.className = "";
+            el.innerHTML = items.map((item) => `
+                <div class="mini-card" style="margin-bottom:10px;">
+                    <div class="mini-title">${escapeHtml(item.task || "未知任务")}</div>
+                    <div class="muted">${escapeHtml(item.owner || "待分配")} · ${escapeHtml(item.deadline || "待定")} · ${escapeHtml(item.priority || "中")}</div>
+                    <div style="margin-top:6px;">${escapeHtml(item.context || "会议讨论")}</div>
+                </div>
+            `).join("");
+        }
+
+        function renderSpeakers(items) {
+            const el = document.getElementById("speakersContainer");
+            if (!items.length) {
+                el.className = "empty";
+                el.innerHTML = "暂无发言人数据";
+                return;
+            }
+            el.className = "";
+            el.innerHTML = items.map((item) => `
+                <div class="mini-card" style="margin-bottom:10px;">
+                    <div class="mini-title">${escapeHtml(item.speaker_name || item.speaker_id || "未知")}</div>
+                    <div class="muted">${escapeHtml(item.role || "未知")} · 参与度 ${(item.participation_rate || 0).toFixed(1)}%</div>
+                </div>
+            `).join("");
+        }
+
+        function renderDecisions(items) {
+            const el = document.getElementById("decisionsContainer");
+            if (!items.length) {
+                el.className = "empty";
+                el.innerHTML = "暂无关键决策";
+                return;
+            }
+            el.className = "";
+            el.innerHTML = items.map((item) => `
+                <div class="mini-card" style="margin-bottom:10px;">
+                    <div class="mini-title">${escapeHtml(item.title || "未命名决策")}</div>
+                    <div class="muted">${escapeHtml(item.timestamp || "未知时间")} · 影响等级 ${escapeHtml(item.impact || "未知")}</div>
+                    <div style="margin-top:6px;">${escapeHtml(item.description || "无描述")}</div>
+                </div>
+            `).join("");
+        }
+
+        function renderMemory() {
+            const stats = memoryCache.stats || {};
+            const tasks = memoryCache.tasks || [];
+            const requirements = memoryCache.requirements || [];
+            const taskCounts = {
+                open: tasks.filter((task) => task.status === "open").length,
+                in_progress: tasks.filter((task) => task.status === "in_progress").length,
+                completed: tasks.filter((task) => task.status === "completed").length,
+                blocked: tasks.filter((task) => task.status === "blocked").length,
+            };
+            document.getElementById("memoryStats").innerHTML = `
+                <div class="pill">历史会议: ${stats.total_meetings || 0}</div>
+                <div class="pill">全局任务: ${stats.memory_tasks || 0}</div>
+                <div class="pill">老板要求: ${stats.memory_requirements || 0}</div>
+                <div class="pill">本轮完成识别: ${tasks.filter((task) => task.completed_in_meeting_id).length}</div>
+            `;
+            document.getElementById("memoryStatusSummary").innerHTML = `
+                <div class="stat-card"><div class="mini-title">待跟进任务</div><div class="muted">当前仍未关闭的任务</div><h2 style="margin-top:8px;">${taskCounts.open}</h2></div>
+                <div class="stat-card"><div class="mini-title">推进中任务</div><div class="muted">会议中已提到进度推进</div><h2 style="margin-top:8px;">${taskCounts.in_progress}</h2></div>
+                <div class="stat-card"><div class="mini-title">已完成任务</div><div class="muted">已在某次会议里确认完成</div><h2 style="margin-top:8px;">${taskCounts.completed}</h2></div>
+                <div class="stat-card"><div class="mini-title">阻塞任务</div><div class="muted">会议里明确提到受阻</div><h2 style="margin-top:8px;">${taskCounts.blocked}</h2></div>
+            `;
+
+            const taskEl = document.getElementById("taskMemoryContainer");
+            if (!tasks.length) {
+                taskEl.className = "empty";
+                taskEl.innerHTML = "暂无全局任务数据";
+            } else {
+                taskEl.className = "";
+                taskEl.innerHTML = tasks.map((task) => `
+                    <div class="task-memory-card">
+                        <div class="task-memory-head">
+                            <div>
+                                <div class="mini-title">${escapeHtml(task.title || "未命名任务")}</div>
+                                <div class="muted" style="margin-top:6px;">负责人 ${escapeHtml(task.owner || "待分配")} · 优先级 ${escapeHtml(task.priority || "中")} · 被提及 ${task.occurrence_count || 0} 次</div>
+                            </div>
+                            <div class="status-badge status-${escapeHtml(task.status || "open")}">${formatTaskStatus(task.status)}</div>
+                        </div>
+                        <div class="meta-grid">
+                            <div class="meta-chip"><strong>提出会议</strong><br>${escapeHtml(task.created_from_meeting_title || "未知会议")}</div>
+                            <div class="meta-chip"><strong>提出时间</strong><br>${escapeHtml(task.created_from_meeting_date || "未知日期")}</div>
+                            <div class="meta-chip"><strong>最近提及</strong><br>${escapeHtml(task.last_seen_meeting_title || "暂无")}</div>
+                            <div class="meta-chip"><strong>截止日期</strong><br>${escapeHtml(task.deadline || "待定")}</div>
+                            <div class="meta-chip"><strong>完成会议</strong><br>${escapeHtml(task.completed_in_meeting_title || "尚未完成")}</div>
+                            <div class="meta-chip"><strong>完成时间</strong><br>${escapeHtml(task.completed_in_meeting_date || "未确认")}</div>
+                        </div>
+                        <div style="margin-top:10px;">最新摘要：${escapeHtml(task.latest_summary || task.latest_context || "暂无")}</div>
+                        <div class="muted" style="margin-top:6px;">最近上下文：${escapeHtml(task.latest_context || "无")}</div>
+                        ${(task.updates || []).length ? `<ul class="list" style="margin-top:10px;">${task.updates.slice(0, 4).map((update) => `<li>${escapeHtml(formatTaskUpdate(update.update_type))} · ${escapeHtml(update.summary || "")}${update.meeting_date ? ` (${escapeHtml(update.meeting_date)})` : ""}</li>`).join("")}</ul>` : ""}
+                    </div>
+                `).join("");
+            }
+
+            const reqEl = document.getElementById("requirementMemoryContainer");
+            if (!requirements.length) {
+                reqEl.className = "empty";
+                reqEl.innerHTML = "暂无老板要求库数据";
+            } else {
+                reqEl.className = "";
+                reqEl.innerHTML = requirements.map((item) => `
+                    <div class="mini-card" style="margin-bottom:10px;">
+                        <div class="mini-title">${escapeHtml(item.requirement_text || "未命名要求")}</div>
+                        <div class="muted">状态 ${escapeHtml(item.status || "active")} · 被提及 ${item.occurrence_count || 0} 次</div>
+                        ${(item.updates || []).length ? `<ul class="list" style="margin-top:8px;">${item.updates.slice(0, 3).map((update) => `<li>${escapeHtml(update.update_type)} · ${escapeHtml(update.summary || "")}</li>`).join("")}</ul>` : ""}
+                    </div>
+                `).join("");
+            }
+        }
+
+        function switchView(viewName) {
+            currentView = viewName;
+            document.querySelectorAll(".view-btn").forEach((button) => {
+                button.classList.toggle("active", button.dataset.view === viewName);
+            });
+            document.querySelectorAll(".view-panel").forEach((panel) => {
+                panel.classList.toggle("active", panel.id === `view-${viewName}`);
+            });
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll(".tab-btn").forEach((button) => {
+                button.classList.toggle("active", button.dataset.tab === tabName);
+            });
+            document.querySelectorAll(".tab-panel").forEach((panel) => {
+                panel.classList.toggle("active", panel.id === `tab-${tabName}`);
+            });
+        }
+
+        function downloadCurrent(fileType) {
+            if (!currentSessionId) return;
+            window.location.href = `/api/download/${currentSessionId}/${fileType}`;
+        }
+
+        async function deleteHistory(sessionId) {
+            if (!sessionId) return;
+            const ok = window.confirm("确认删除这条历史记录吗？会同时删除数据库记录和本地输出文件。");
+            if (!ok) return;
+
+            const res = await fetch(`/api/history/${sessionId}`, { method: "DELETE" });
+            const data = await res.json();
+            if (!res.ok || data.error) {
+                alert(data.error || "删除失败");
+                return;
+            }
+
+            if (currentSessionId === sessionId) {
+                currentSessionId = null;
+                resetCurrentView();
+            }
+
+            await loadHistory();
+        }
+
+        function resetCurrentView() {
+            document.getElementById("resultTitle").textContent = "当前结果";
+            document.getElementById("resultSummary").textContent = "还没有加载任何会议结果。你可以上传视频开始分析，或者从左侧历史记录中选择一个会话。";
+            document.getElementById("resultMeta").innerHTML = "";
+            renderList("bossMessages", [], "未识别到明确老板要求");
+            renderList("riskList", [], "未识别到明显风险");
+            renderList("nextStepList", [], "未识别到明确下一步");
+            renderObjectList("employeeUpdates", [], () => "", "未识别到员工汇报摘要");
+            renderObjectList("participantList", [], () => "", "暂无参与者数据");
+            document.getElementById("timelineContainer").className = "empty";
+            document.getElementById("timelineContainer").innerHTML = "暂无议题时间轴";
+            document.getElementById("actionItemsContainer").className = "empty";
+            document.getElementById("actionItemsContainer").innerHTML = "暂无待办事项";
+            document.getElementById("speakersContainer").className = "empty";
+            document.getElementById("speakersContainer").innerHTML = "暂无发言人数据";
+            document.getElementById("decisionsContainer").className = "empty";
+            document.getElementById("decisionsContainer").innerHTML = "暂无关键决策";
+            document.getElementById("reportFrame").src = "";
+            renderMemory();
+        }
+
+        function formatTime(value) {
+            if (value === undefined || value === null) return "00:00";
+            if (typeof value === "string") return value;
+            const total = Math.max(0, Math.floor(value));
+            const h = Math.floor(total / 3600);
+            const m = Math.floor((total % 3600) / 60);
+            const s = total % 60;
+            if (h > 0) return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+            return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+        }
+
+        function formatTaskStatus(value) {
+            return {
+                open: "待跟进",
+                in_progress: "推进中",
+                completed: "已完成",
+                blocked: "阻塞",
+            }[value] || "待跟进";
+        }
+
+        function formatTaskUpdate(value) {
+            return {
+                created: "新建",
+                mentioned: "再次提及",
+                progress: "进展更新",
+                completed: "完成",
+                blocked: "阻塞",
+                reopened: "重新打开",
+            }[value] || value;
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? "")
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        loadMemory();
+        loadHistory();
     </script>
 </body>
 </html>

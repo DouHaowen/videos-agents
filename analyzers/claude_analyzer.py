@@ -7,7 +7,7 @@ import time
 import base64
 from pathlib import Path
 import cv2
-from moviepy.editor import VideoFileClip
+from moviepy import VideoFileClip
 from anthropic import Anthropic
 from .base import VideoAnalyzer
 

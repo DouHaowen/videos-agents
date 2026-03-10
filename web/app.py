@@ -1,298 +1,278 @@
 """
 Flask Web 应用
-提供视频上传和分析的 Web 界面
+提供视频上传、完整会议分析和报告查看能力。
 """
 
-import os
 import json
-from pathlib import Path
+import os
+import shutil
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, send_file
-from werkzeug.utils import secure_filename
-import google.generativeai as genai
-from dotenv import load_dotenv
+from pathlib import Path
 
-from processors.segmenter import MeetingSegmenter
-from processors.action_item_extractor import ActionItemExtractor
-from exporters.markdown_exporter import MarkdownExporter
-from timeline_report_generator import TimelineReportGenerator
+from dotenv import load_dotenv
+from flask import Flask, jsonify, render_template, request, send_file
+from werkzeug.utils import secure_filename
+
+from meeting_pipeline import MeetingAnalysisPipeline
+from knowledge.database import MeetingDatabase
 
 load_dotenv()
 
-# 设置代理（如果配置了）
-if os.getenv('HTTP_PROXY'):
-    os.environ['http_proxy'] = os.getenv('HTTP_PROXY')
-    os.environ['https_proxy'] = os.getenv('HTTPS_PROXY', os.getenv('HTTP_PROXY'))
-    print(f"✓ 代理已配置: {os.getenv('HTTP_PROXY')}")
+if os.getenv("HTTP_PROXY"):
+    os.environ["http_proxy"] = os.getenv("HTTP_PROXY")
+    os.environ["https_proxy"] = os.getenv("HTTPS_PROXY", os.getenv("HTTP_PROXY"))
 
 
 def create_app():
-    """创建 Flask 应用"""
     app = Flask(__name__)
-    app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB
-    app.config['UPLOAD_FOLDER'] = Path('uploads')
-    app.config['OUTPUT_FOLDER'] = Path('output')
-    
-    # 创建必要的目录
-    app.config['UPLOAD_FOLDER'].mkdir(exist_ok=True)
-    app.config['OUTPUT_FOLDER'].mkdir(exist_ok=True)
-    
-    # 配置 Gemini
-    genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-    
-    @app.route('/')
+    app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
+    project_root = Path(__file__).resolve().parent.parent
+    app.config["UPLOAD_FOLDER"] = project_root / "uploads"
+    app.config["OUTPUT_FOLDER"] = project_root / "output"
+    app.config["UPLOAD_FOLDER"].mkdir(exist_ok=True)
+    app.config["OUTPUT_FOLDER"].mkdir(exist_ok=True)
+
+    pipeline = MeetingAnalysisPipeline()
+
+    def load_session_payload(session_id):
+        session_dir = app.config["OUTPUT_FOLDER"] / session_id
+        if not session_dir.exists():
+            return None
+
+        results = {"session_id": session_id}
+        for filename, key in {
+            "basic_analysis.json": "basic_analysis",
+            "structured_transcript.json": "structured_transcript",
+            "segments.json": "segments",
+            "action_items.json": "action_items",
+            "speakers.json": "speakers",
+            "decisions.json": "decisions",
+            "statistics.json": "statistics",
+            "participant_roles.json": "participant_roles",
+        }.items():
+            path = session_dir / filename
+            if path.exists():
+                with open(path, "r", encoding="utf-8") as file:
+                    results[key] = json.load(file)
+
+        basic = results.get("basic_analysis", {})
+        results["summary_card"] = {
+            "title": basic.get("title", session_id),
+            "summary": basic.get("summary", ""),
+            "category": basic.get("category", "未分类"),
+            "date": _infer_date(session_id),
+            "boss_messages_count": len(basic.get("manager_summary", {}).get("boss_messages", [])),
+            "action_items_count": len(results.get("action_items", [])),
+            "segments_count": len(results.get("segments", [])),
+        }
+        return results
+
+    def build_history():
+        history = []
+        seen = set()
+
+        db_path = Path("knowledge/meetings.db")
+        if db_path.exists():
+            db = MeetingDatabase(str(db_path))
+            try:
+                for row in db.list_meetings(limit=100):
+                    session_id = row.get("session_id")
+                    if not session_id or session_id in seen:
+                        continue
+                    seen.add(session_id)
+                    history.append(
+                        {
+                            "session_id": session_id,
+                            "title": row.get("title") or session_id,
+                            "date": row.get("date"),
+                            "category": row.get("category") or "未分类",
+                            "summary": row.get("summary") or "",
+                            "output_dir": row.get("output_dir") or str(app.config["OUTPUT_FOLDER"] / session_id),
+                        }
+                    )
+            finally:
+                db.close()
+
+        for session_dir in sorted(app.config["OUTPUT_FOLDER"].iterdir(), reverse=True):
+            if not session_dir.is_dir():
+                continue
+            session_id = session_dir.name
+            if session_id in seen:
+                continue
+
+            payload = load_session_payload(session_id)
+            if not payload:
+                continue
+
+            summary_card = payload.get("summary_card", {})
+            history.append(
+                {
+                    "session_id": session_id,
+                    "title": summary_card.get("title", session_id),
+                    "date": summary_card.get("date"),
+                    "category": summary_card.get("category", "未分类"),
+                    "summary": summary_card.get("summary", ""),
+                    "output_dir": str(session_dir),
+                }
+            )
+        return history
+
+    def load_memory():
+        db_path = project_root / "knowledge" / "meetings.db"
+        if not db_path.exists():
+            return {"tasks": [], "requirements": [], "stats": {}}
+
+        db = MeetingDatabase(str(db_path))
+        try:
+            tasks = db.list_task_memory(limit=300)
+            requirements = db.list_requirement_memory(limit=300)
+            for task in tasks:
+                task["updates"] = db.get_task_updates(task["id"])[:8]
+            for requirement in requirements:
+                requirement["updates"] = db.get_requirement_updates(requirement["id"])[:8]
+            stats = db.get_statistics()
+            return {"tasks": tasks, "requirements": requirements, "stats": stats}
+        finally:
+            db.close()
+
+    @app.route("/")
     def index():
-        """首页"""
-        return render_template('index.html')
-    
-    @app.route('/api/upload', methods=['POST'])
+        return render_template("index.html")
+
+    @app.route("/api/upload", methods=["POST"])
     def upload_video():
-        """上传视频"""
-        if 'video' not in request.files:
-            return jsonify({'error': '没有上传文件'}), 400
-        
-        file = request.files['video']
-        if file.filename == '':
-            return jsonify({'error': '文件名为空'}), 400
-        
-        # 保存文件
+        if "video" not in request.files:
+            return jsonify({"error": "没有上传文件"}), 400
+
+        file = request.files["video"]
+        if not file.filename:
+            return jsonify({"error": "文件名为空"}), 400
+
         filename = secure_filename(file.filename)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         safe_filename = f"{timestamp}_{filename}"
-        filepath = app.config['UPLOAD_FOLDER'] / safe_filename
+        filepath = (app.config["UPLOAD_FOLDER"] / safe_filename).resolve()
         file.save(filepath)
-        
-        return jsonify({
-            'success': True,
-            'filename': safe_filename,
-            'filepath': str(filepath)
-        })
-    
-    @app.route('/api/analyze', methods=['POST'])
+
+        return jsonify(
+            {
+                "success": True,
+            "filename": safe_filename,
+            "filepath": str(filepath),
+            }
+        )
+
+    @app.route("/api/analyze", methods=["POST"])
     def analyze_video():
-        """分析视频"""
-        data = request.json
-        filepath = data.get('filepath')
-        analysis_type = data.get('type', 'deep')  # deep/quick
-        
+        data = request.json or {}
+        filepath = data.get("filepath")
+        save_to_db = data.get("save_to_db", True)
+
         if not filepath or not Path(filepath).exists():
-            return jsonify({'error': '文件不存在'}), 400
-        
+            return jsonify({"error": "文件不存在"}), 400
+
         try:
-            if analysis_type == 'deep':
-                result = perform_deep_analysis(filepath)
-            else:
-                result = perform_quick_analysis(filepath)
-            
+            result = pipeline.analyze(
+                video_path=filepath,
+                output_root=str(app.config["OUTPUT_FOLDER"]),
+                mode="complete",
+                save_to_db=save_to_db,
+            )
             return jsonify(result)
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-    
-    @app.route('/api/results/<session_id>')
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 500
+
+    @app.route("/api/results/<session_id>")
     def get_results(session_id):
-        """获取分析结果"""
-        session_dir = app.config['OUTPUT_FOLDER'] / session_id
-        
-        if not session_dir.exists():
-            return jsonify({'error': '结果不存在'}), 404
-        
-        # 读取结果文件
-        results = {}
-        
-        if (session_dir / 'basic_analysis.json').exists():
-            with open(session_dir / 'basic_analysis.json', 'r', encoding='utf-8') as f:
-                results['basic_analysis'] = json.load(f)
-        
-        if (session_dir / 'segments.json').exists():
-            with open(session_dir / 'segments.json', 'r', encoding='utf-8') as f:
-                results['segments'] = json.load(f)
-        
-        if (session_dir / 'action_items.json').exists():
-            with open(session_dir / 'action_items.json', 'r', encoding='utf-8') as f:
-                results['action_items'] = json.load(f)
-        
-        return jsonify(results)
-    
-    @app.route('/api/download/<session_id>/<file_type>')
+        payload = load_session_payload(session_id)
+        if not payload:
+            return jsonify({"error": "结果不存在"}), 404
+        return jsonify(payload)
+
+    @app.route("/api/history")
+    def history_list():
+        return jsonify({"items": build_history()})
+
+    @app.route("/api/memory")
+    def memory_overview():
+        return jsonify(load_memory())
+
+    @app.route("/api/history/<session_id>")
+    def history_detail(session_id):
+        payload = load_session_payload(session_id)
+        if not payload:
+            return jsonify({"error": "历史记录不存在"}), 404
+        return jsonify(payload)
+
+    @app.route("/api/history/<session_id>", methods=["DELETE"])
+    def delete_history(session_id):
+        removed_db = 0
+        db_path = project_root / "knowledge" / "meetings.db"
+        if db_path.exists():
+            db = MeetingDatabase(str(db_path))
+            try:
+                removed_db = db.delete_meeting_by_session_id(session_id)
+            finally:
+                db.close()
+
+        session_dir = (app.config["OUTPUT_FOLDER"] / session_id).resolve()
+        removed_files = False
+        if session_dir.exists() and session_dir.is_dir():
+            shutil.rmtree(session_dir)
+            removed_files = True
+
+        if not removed_db and not removed_files:
+            return jsonify({"error": "历史记录不存在"}), 404
+
+        return jsonify({
+            "success": True,
+            "session_id": session_id,
+            "removed_db": removed_db,
+            "removed_files": removed_files,
+        })
+
+    @app.route("/api/download/<session_id>/<file_type>")
     def download_file(session_id, file_type):
-        """下载文件"""
-        session_dir = app.config['OUTPUT_FOLDER'] / session_id
-        
+        session_dir = app.config["OUTPUT_FOLDER"] / session_id
         file_map = {
-            'markdown': 'meeting_minutes.md',
-            'timeline': 'timeline_report.html',
-            'json': 'basic_analysis.json'
+            "markdown": "meeting_minutes.md",
+            "timeline": "timeline_report.html",
+            "json": "basic_analysis.json",
+            "pdf": "meeting_report.pdf",
+            "speakers": "speaker_report.md",
+            "decisions": "decision_report.md",
+            "structured": "structured_transcript.json",
         }
-        
         filename = file_map.get(file_type)
         if not filename:
-            return jsonify({'error': '不支持的文件类型'}), 400
-        
-        filepath = session_dir / filename
+            return jsonify({"error": "不支持的文件类型"}), 400
+
+        filepath = (session_dir / filename).resolve()
         if not filepath.exists():
-            return jsonify({'error': '文件不存在'}), 404
-        
+            return jsonify({"error": "文件不存在"}), 404
+
         return send_file(filepath, as_attachment=True)
-    
-    @app.route('/view/<session_id>')
+
+    @app.route("/view/<session_id>")
     def view_report(session_id):
-        """查看报告"""
-        session_dir = app.config['OUTPUT_FOLDER'] / session_id
-        report_path = session_dir / 'timeline_report.html'
-        
+        report_path = (app.config["OUTPUT_FOLDER"] / session_id / "timeline_report.html").resolve()
         if not report_path.exists():
             return "报告不存在", 404
-        
-        with open(report_path, 'r', encoding='utf-8') as f:
-            return f.read()
-    
-    def perform_deep_analysis(filepath):
-        """执行深度分析"""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        session_id = f"deep_analysis_{timestamp}"
-        session_dir = app.config['OUTPUT_FOLDER'] / session_id
-        session_dir.mkdir(exist_ok=True)
-        
-        model = genai.GenerativeModel("gemini-2.0-flash")
-        
-        # 上传视频
-        video_file = genai.upload_file(path=filepath)
-        
-        # 等待处理
-        import time
-        while video_file.state.name == "PROCESSING":
-            time.sleep(2)
-            video_file = genai.get_file(video_file.name)
-        
-        if video_file.state.name == "FAILED":
-            raise ValueError("视频处理失败")
-        
-        # 基础分析
-        basic_prompt = """请分析这个会议视频，提供：
-1. 会议主题摘要（1-2句话）
-2. 主要讨论点（3-5个）
-3. 场景分类（工作/私生活/健康/运动/出行）
-4. 完整的会议转录文本
 
-请以 JSON 格式返回：
-{
-  "summary": "会议摘要",
-  "key_points": ["讨论点1", "讨论点2"],
-  "category": "分类",
-  "transcript": "完整转录文本"
-}"""
-        
-        response = model.generate_content(
-            [video_file, basic_prompt],
-            generation_config=genai.GenerationConfig(
-                temperature=0.3,
-                response_mime_type="application/json"
-            )
-        )
-        
-        basic_analysis = json.loads(response.text)
-        transcript = basic_analysis.get("transcript", "")
-        
-        # 保存基础分析
-        with open(session_dir / "basic_analysis.json", "w", encoding="utf-8") as f:
-            json.dump(basic_analysis, f, ensure_ascii=False, indent=2)
-        
-        # 获取视频时长
-        import cv2
-        cap = cv2.VideoCapture(filepath)
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
-        video_duration = frame_count / fps if fps > 0 else 600
-        cap.release()
-        
-        # 智能分段
-        segmenter = MeetingSegmenter(model)
-        segments = segmenter.segment_meeting(transcript, video_duration)
-        
-        with open(session_dir / "segments.json", "w", encoding="utf-8") as f:
-            json.dump(segments, f, ensure_ascii=False, indent=2)
-        
-        # 提取待办事项
-        extractor = ActionItemExtractor(model)
-        action_items = extractor.extract_action_items(transcript, segments)
-        
-        with open(session_dir / "action_items.json", "w", encoding="utf-8") as f:
-            json.dump(action_items, f, ensure_ascii=False, indent=2)
-        
-        # 生成 Markdown
-        md_exporter = MarkdownExporter()
-        meeting_info = {
-            "date": datetime.now().strftime("%Y年%m月%d日"),
-            "title": "会议分析",
-            "duration": MeetingSegmenter.format_time(video_duration)
-        }
-        md_exporter.export_meeting_minutes(
-            basic_analysis, segments, action_items, session_dir, meeting_info
-        )
-        
-        # 生成时间轴报告
-        timeline_gen = TimelineReportGenerator()
-        timeline_gen.generate_timeline_report(
-            basic_analysis, segments, action_items, session_dir
-        )
-        
-        # 清理
-        genai.delete_file(video_file.name)
-        
-        return {
-            'success': True,
-            'session_id': session_id,
-            'summary': basic_analysis.get('summary'),
-            'category': basic_analysis.get('category'),
-            'segments_count': len(segments),
-            'action_items_count': len(action_items)
-        }
-    
-    def perform_quick_analysis(filepath):
-        """执行快速分析"""
-        # 简化版本，只做基础分析
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        session_id = f"quick_analysis_{timestamp}"
-        session_dir = app.config['OUTPUT_FOLDER'] / session_id
-        session_dir.mkdir(exist_ok=True)
-        
-        model = genai.GenerativeModel("gemini-2.0-flash")
-        video_file = genai.upload_file(path=filepath)
-        
-        import time
-        while video_file.state.name == "PROCESSING":
-            time.sleep(2)
-            video_file = genai.get_file(video_file.name)
-        
-        prompt = """请分析这个会议视频，提供简要摘要和主要讨论点。
-返回 JSON 格式：{"summary": "摘要", "key_points": ["点1", "点2"], "category": "分类"}"""
-        
-        response = model.generate_content(
-            [video_file, prompt],
-            generation_config=genai.GenerationConfig(
-                temperature=0.3,
-                response_mime_type="application/json"
-            )
-        )
-        
-        result = json.loads(response.text)
-        
-        with open(session_dir / "analysis.json", "w", encoding="utf-8") as f:
-            json.dump(result, f, ensure_ascii=False, indent=2)
-        
-        genai.delete_file(video_file.name)
-        
-        return {
-            'success': True,
-            'session_id': session_id,
-            'summary': result.get('summary'),
-            'category': result.get('category'),
-            'key_points': result.get('key_points', [])
-        }
-    
+        with open(report_path, "r", encoding="utf-8") as file:
+            return file.read()
+
     return app
 
 
-if __name__ == '__main__':
-    app = create_app()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+def _infer_date(session_id: str) -> str:
+    try:
+        raw = session_id.rsplit("_", 2)
+        stamp = f"{raw[-2]}_{raw[-1]}"
+        return datetime.strptime(stamp, "%Y%m%d_%H%M%S").strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return ""
+
+
+if __name__ == "__main__":
+    create_app().run(debug=True, host="0.0.0.0", port=5000)

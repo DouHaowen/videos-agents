@@ -1,153 +1,123 @@
 """
-说话人识别模块
-使用 Gemini 的多模态能力识别不同的发言人
+说话人识别与角色汇总模块
+优先使用结构化转录中的参与者与发言片段。
 """
 
-import json
-from typing import List, Dict
+from typing import Dict, List
 
 
 class SpeakerDiarizer:
-    """说话人识别器"""
-    
+    """说话人识别器。"""
+
     def __init__(self, client):
-        """
-        初始化识别器
-        
-        Args:
-            client: AI 客户端（Gemini）
-        """
         self.client = client
-    
+
     def identify_speakers(
         self,
         transcript: str,
-        segments: List[Dict] = None
+        segments: List[Dict] = None,
+        utterances: List[Dict] = None,
+        participant_roles: List[Dict] = None,
     ) -> List[Dict]:
-        """
-        识别转录文本中的不同发言人
-        
-        Args:
-            transcript: 会议转录文本
-            segments: 分段信息（可选）
-        
-        Returns:
-            发言人信息列表，每项包含：
-            {
-                "speaker_id": str,        # 发言人ID（如 "发言人A"）
-                "speaker_name": str,      # 发言人名称（如果能识别）
-                "segments": [             # 该发言人的发言片段
-                    {
-                        "text": str,      # 发言内容
-                        "start_time": float,  # 开始时间（如果有）
-                        "end_time": float     # 结束时间（如果有）
-                    }
-                ],
-                "total_duration": float,  # 总发言时长
-                "word_count": int,        # 发言字数
-                "participation_rate": float  # 参与度百分比
-            }
-        """
-        prompt = f"""请分析以下会议转录内容，识别不同的发言人。
+        segments = segments or []
+        utterances = utterances or []
+        participant_roles = participant_roles or []
 
-会议转录：
-{transcript[:4000]}
+        by_speaker = {}
+        total_chars = 0
 
-请完成以下任务：
-1. 识别对话中有几个不同的发言人
-2. 为每个发言人分配一个标识（如"发言人A"、"发言人B"等）
-3. 如果能从对话中推断出发言人的名字或角色，请标注
-4. 将转录内容按发言人分段
-5. 估算每个发言人的发言比例
-
-请以 JSON 格式返回：
-{{
-  "speakers": [
-    {{
-      "speaker_id": "发言人A",
-      "speaker_name": "张三（如果能识别）或 未知",
-      "role": "主持人/参与者/未知",
-      "segments": [
-        {{
-          "text": "发言内容",
-          "context": "在哪个议题中发言"
-        }}
-      ],
-      "word_count": 发言字数,
-      "participation_rate": 参与度百分比
-    }}
-  ],
-  "total_speakers": 总发言人数
-}}
-
-注意：
-- 根据语气、称呼、话题连贯性等判断发言人
-- 如果无法明确区分，可以标注为"无法区分"
-- 参与度 = 该发言人字数 / 总字数 * 100
-"""
-        
-        # 调用 LLM
-        import google.generativeai as genai
-        response = self.client.generate_content(
-            prompt,
-            generation_config=genai.GenerationConfig(
-                temperature=0.2,
-                response_mime_type="application/json"
+        for item in utterances:
+            speaker_id = item.get("speaker_id", "未知")
+            text = item.get("text", "")
+            total_chars += len(text)
+            entry = by_speaker.setdefault(
+                speaker_id,
+                {
+                    "speaker_id": speaker_id,
+                    "speaker_name": item.get("speaker_name", "未知"),
+                    "role": item.get("role", "未知"),
+                    "segments": [],
+                    "word_count": 0,
+                    "total_duration": 0.0,
+                    "is_manager": item.get("role") == "老板",
+                },
             )
-        )
-        
-        result = json.loads(response.text)
-        speakers = result.get("speakers", [])
-        
-        # 计算总时长（如果有分段信息）
-        if segments:
-            total_duration = sum(seg.get('duration', 0) for seg in segments)
-            for speaker in speakers:
-                # 估算发言时长 = 总时长 * 参与度
-                speaker['total_duration'] = total_duration * (speaker.get('participation_rate', 0) / 100)
-        
+            entry["segments"].append(
+                {
+                    "text": text,
+                    "start_time": item.get("start_time"),
+                    "end_time": item.get("end_time"),
+                    "context": self._find_context(item, segments),
+                }
+            )
+            entry["word_count"] += len(text)
+            entry["total_duration"] += self._duration(item)
+
+        for role_info in participant_roles:
+            speaker_id = role_info.get("speaker_id")
+            if not speaker_id:
+                continue
+            entry = by_speaker.setdefault(
+                speaker_id,
+                {
+                    "speaker_id": speaker_id,
+                    "speaker_name": role_info.get("speaker_name", "未知"),
+                    "role": role_info.get("role", "未知"),
+                    "segments": [],
+                    "word_count": 0,
+                    "total_duration": 0.0,
+                    "is_manager": role_info.get("is_manager", False),
+                },
+            )
+            entry["speaker_name"] = role_info.get("speaker_name", entry["speaker_name"])
+            entry["role"] = role_info.get("role", entry["role"])
+            entry["is_manager"] = role_info.get("is_manager", entry.get("is_manager", False))
+
+        speakers = list(by_speaker.values())
+        for speaker in speakers:
+            if total_chars > 0:
+                speaker["participation_rate"] = speaker["word_count"] / total_chars * 100
+            else:
+                speaker["participation_rate"] = 0.0
+
+        speakers.sort(key=lambda item: item.get("participation_rate", 0), reverse=True)
         return speakers
-    
+
     def generate_speaker_report(self, speakers: List[Dict]) -> str:
-        """
-        生成发言人分析报告
-        
-        Args:
-            speakers: 发言人信息列表
-        
-        Returns:
-            Markdown 格式的报告
-        """
         report = "# 发言人分析报告\n\n"
-        report += f"## 总览\n\n"
-        report += f"- 识别到 {len(speakers)} 位发言人\n\n"
-        
+        report += f"## 总览\n\n- 识别到 {len(speakers)} 位发言人\n\n"
         report += "## 发言人详情\n\n"
-        
-        for i, speaker in enumerate(speakers, 1):
-            speaker_id = speaker.get('speaker_id', f'发言人{i}')
-            speaker_name = speaker.get('speaker_name', '未知')
-            role = speaker.get('role', '未知')
-            word_count = speaker.get('word_count', 0)
-            participation = speaker.get('participation_rate', 0)
-            
-            report += f"### {i}. {speaker_id}\n\n"
-            report += f"- **姓名**: {speaker_name}\n"
-            report += f"- **角色**: {role}\n"
-            report += f"- **发言字数**: {word_count}\n"
-            report += f"- **参与度**: {participation:.1f}%\n"
-            
-            if 'total_duration' in speaker:
-                from processors.segmenter import MeetingSegmenter
-                duration_str = MeetingSegmenter.format_time(speaker['total_duration'])
-                report += f"- **发言时长**: {duration_str}\n"
-            
-            report += "\n**主要发言**:\n\n"
-            segments = speaker.get('segments', [])[:3]  # 只显示前3段
-            for seg in segments:
-                text = seg.get('text', '')[:100]  # 限制长度
-                report += f"- {text}...\n"
-            
+
+        for index, speaker in enumerate(speakers, 1):
+            report += f"### {index}. {speaker.get('speaker_name', '未知')} ({speaker.get('speaker_id', '未知')})\n\n"
+            report += f"- 角色: {speaker.get('role', '未知')}\n"
+            report += f"- 是否管理者: {'是' if speaker.get('is_manager') else '否'}\n"
+            report += f"- 发言字数: {speaker.get('word_count', 0)}\n"
+            report += f"- 参与度: {speaker.get('participation_rate', 0):.1f}%\n"
+            report += f"- 发言时长: {speaker.get('total_duration', 0):.1f} 秒\n\n"
+            report += "**代表性发言**:\n"
+            for seg in speaker.get("segments", [])[:3]:
+                report += f"- [{seg.get('start_time', '00:00')}] {seg.get('text', '')[:120]}\n"
             report += "\n"
-        
+
         return report
+
+    def _find_context(self, utterance: Dict, segments: List[Dict]) -> str:
+        start_time = utterance.get("start_time")
+        if not start_time:
+            return "会议讨论"
+
+        from processors.segmenter import MeetingSegmenter
+
+        start_seconds = MeetingSegmenter.parse_time_to_seconds(start_time)
+        for segment in segments:
+            if segment.get("start_time", 0) <= start_seconds <= segment.get("end_time", 0):
+                return segment.get("title", "会议讨论")
+        return "会议讨论"
+
+    def _duration(self, utterance: Dict) -> float:
+        from processors.segmenter import MeetingSegmenter
+
+        start = MeetingSegmenter.parse_time_to_seconds(utterance.get("start_time", "00:00:00"))
+        end = MeetingSegmenter.parse_time_to_seconds(utterance.get("end_time", utterance.get("start_time", "00:00:00")))
+        return max(0.0, end - start)
