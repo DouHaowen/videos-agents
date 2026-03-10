@@ -1,276 +1,264 @@
-# 会议视频分析系统 🎬
+# 会议视频分析系统
 
-AI 驱动的智能会议分析工具，支持 Web 界面、智能分段、发言人识别、决策点检测、多格式导出和知识库管理。
+一个面向日常团队会议的 AI 分析系统。当前主链路已经升级为：
 
-## ✨ 核心功能
+`上传视频 -> 提取音频 -> OpenAI 转录 -> Gemini 分析文本 -> 生成纪要/待办/决策 -> 沉淀历史和全局任务中心`
 
-### 🌐 Web 界面（推荐）
-- ✅ **拖拽上传** - 简单易用的 Web 界面
-- ✅ **实时进度** - 可视化分析进度
-- ✅ **在线查看** - 直接在浏览器查看报告
-- ✅ **一键下载** - 下载多种格式报告
+它的目标不是只做一次性总结，而是持续记录会议内容，追踪老板要求、任务进展和跨会议状态变化。
 
-### 🎯 完整分析功能
-- ✅ **智能分段** - 自动识别议题切换点，生成时间轴
-- ✅ **待办事项提取** - 识别任务、负责人、截止日期
-- ✅ **发言人识别** - 识别不同发言人及参与度
-- ✅ **决策点检测** - 自动标注关键决策时刻
-- ✅ **多格式导出** - Markdown、HTML、PDF
-- ✅ **知识库管理** - 存储和搜索历史会议
+## 当前核心能力
 
-## 🚀 快速开始
+### 1. 完整会议分析
+
+- 上传会议视频
+- 自动提取音频
+- 调用 OpenAI 语音转录接口生成文字和发言片段
+- 调用 Gemini 对转录文本做结构化分析
+- 提取老板要求、员工汇报、风险、下一步动作
+- 识别议题、待办事项、发言人、关键决策
+
+### 2. 统一 Web 工作台
+
+- 单页联动操作，不再跳转割裂页面
+- 左侧历史记录，右侧当前会议详情
+- 页内查看员工汇报、议题时间轴、待办事项、发言人、决策、完整报告
+- 支持下载 Markdown、PDF、结构化转录
+
+### 3. 历史记录沉淀
+
+- 每次分析都会保留历史
+- 支持回看历史会议
+- 支持删除历史记录
+- 历史信息写入 SQLite 数据库
+
+### 4. 全局任务中心
+
+- 把每次会议的待办事项沉淀成全局任务
+- 记录任务来源会议、提出日期、负责人、优先级、截止日期
+- 记录最近提及会议
+- 如果后续会议提到任务已完成或阻塞，会自动回写状态
+- 展示完成会议和完成日期
+
+### 5. 老板要求长期追踪
+
+- 从会议中提取老板要求
+- 沉淀为长期要求库
+- 和任务中心一起形成持续记忆层
+
+## 当前主流程
+
+1. 用户上传会议视频
+2. 系统从视频中提取音频
+3. 使用 OpenAI 转录接口生成文字和发言片段
+4. 使用 Gemini 对转录文本做结构化理解
+5. 生成：
+   - 会议标题
+   - 摘要
+   - 关键点
+   - 管理视角总结
+   - 议题分段
+   - 待办事项
+   - 发言人汇总
+   - 决策点
+6. 导出 Markdown / HTML / PDF / JSON
+7. 保存会议历史到 SQLite
+8. 同步更新全局任务中心和老板要求库
+9. 在下一次会议中继续利用历史任务做状态联动
+
+## Web 界面
+
+当前 Web 端分成两个主要视图：
+
+### 会议工作台
+
+用于：
+
+- 上传视频
+- 启动完整分析
+- 查看本次会议结果
+- 下载分析产物
+- 浏览和删除历史记录
+
+### 全局任务中心
+
+用于：
+
+- 查看所有历史会议沉淀出的任务
+- 查看任务状态分布
+- 查看任务的来源会议和提出日期
+- 查看截止日期
+- 查看完成会议和完成日期
+- 查看最近的任务更新记录
+- 查看老板要求追踪
+
+## 输出文件
+
+每次完整分析都会在 `output/<session_id>/` 下生成结果，常见文件包括：
+
+- `basic_analysis.json`
+- `transcription.json`
+- `structured_transcript.json`
+- `participant_roles.json`
+- `segments.json`
+- `action_items.json`
+- `speakers.json`
+- `decisions.json`
+- `meeting_minutes.md`
+- `speaker_report.md`
+- `decision_report.md`
+- `timeline_report.html`
+- `meeting_report.pdf`
+- `statistics.json`
+
+## 快速开始
 
 ### 1. 安装依赖
+
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. 配置 API Key
+### 2. 配置环境变量
+
 ```bash
 cp .env.example .env
-# 编辑 .env，填入 GOOGLE_API_KEY
 ```
 
-### 3. 启动 Web 服务（推荐）
+在 `.env` 中至少配置：
 
 ```bash
-# 使用虚拟环境
-source venv/bin/activate  # macOS/Linux
-# 或 venv\Scripts\activate  # Windows
+GOOGLE_API_KEY=your_google_key
+OPENAI_API_KEY=your_openai_key
+```
 
+说明：
+
+- `GOOGLE_API_KEY`：用于 Gemini 文本分析
+- `OPENAI_API_KEY`：用于音频转录
+
+### 3. 启动 Web 服务
+
+推荐直接使用：
+
+```bash
+./start_web.sh
+```
+
+也可以手动启动：
+
+```bash
+source venv/bin/activate
 python run_web.py
 ```
 
-然后在浏览器打开：**http://localhost:8080**
+启动后，浏览器打开：
 
-## 📱 使用方式
+- [http://localhost:8080](http://localhost:8080)
 
-### 方式 1：Web 界面（推荐）⭐
+如果 `8080` 被占用，程序会自动尝试 `8081`、`8082`、`5001` 等端口。
 
-```bash
-python run_web.py
-```
+## 命令行入口
 
-**功能**：
-- 📤 拖拽或点击上传视频
-- 🔬 选择分析模式（深度/快速）
-- 📊 实时查看分析进度
-- 🎨 在线查看交互式报告
-- 💾 一键下载多种格式
-
-### 方式 2：命令行完整分析
+### 完整分析
 
 ```bash
 python analyze_complete.py your_video.mp4
 ```
 
-**输出内容**（11种文件）：
-- `basic_analysis.json` - 基础分析
-- `segments.json` - 智能分段
-- `action_items.json` - 待办事项
-- `speakers.json` - 发言人信息
-- `decisions.json` - 决策点
-- `meeting_minutes.md` - 会议纪要
-- `speaker_report.md` - 发言人报告
-- `decision_report.md` - 决策点报告
-- `timeline_report.html` - 时间轴报告
-- `meeting_report.pdf` - PDF 报告
-- `statistics.json` - 统计信息
-
-### 方式 3：快速分析
+### 深度分析入口
 
 ```bash
-python analyze_meeting_deep.py your_video.mp4  # 深度分析（P0功能）
-python analyze_with_gemini.py your_video.mp4   # 快速分析
+python analyze_meeting_deep.py your_video.mp4
 ```
 
-### 方式 4：多模型对比
+### 统一分析入口
 
 ```bash
-python compare_models.py your_video.mp4
-python compare_models.py your_video.mp4 gemini gpt4o  # 指定模型
+python analyze_with_gemini.py your_video.mp4
 ```
 
-## 📊 功能对比
+说明：
 
-| 功能 | Web界面 | 完整分析 | 深度分析 | 快速分析 | 多模型对比 |
-|------|---------|---------|---------|---------|-----------|
-| 易用性 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐ |
-| 智能分段 | ✅ | ✅ | ✅ | ❌ | ❌ |
-| 待办事项 | ✅ | ✅ | ✅ | ❌ | ❌ |
-| 发言人识别 | ❌ | ✅ | ❌ | ❌ | ❌ |
-| 决策点检测 | ❌ | ✅ | ❌ | ❌ | ❌ |
-| PDF导出 | ❌ | ✅ | ❌ | ❌ | ❌ |
-| 知识库 | ❌ | ✅ | ❌ | ❌ | ❌ |
-| 在线查看 | ✅ | ❌ | ❌ | ❌ | ✅ |
+- 当前这些入口都已统一到完整分析链路
+- 不再保留“快速概览”模式
 
-## 🎨 输出示例
+## 主要模块
 
-### 完整分析输出
-```
-output/complete_analysis_20240309_143022/
-├── basic_analysis.json      # 基础分析
-├── segments.json            # 智能分段
-├── action_items.json        # 待办事项
-├── speakers.json            # 发言人信息
-├── decisions.json           # 决策点
-├── meeting_minutes.md       # 会议纪要
-├── speaker_report.md        # 发言人报告
-├── decision_report.md       # 决策点报告
-├── timeline_report.html     # 时间轴报告
-├── meeting_report.pdf       # PDF 报告
-└── statistics.json          # 统计信息
-```
-
-## 🤖 支持的 AI 模型
-
-| 模型 | 提供商 | 视频支持 | 特点 | 完整分析 |
-|------|--------|----------|------|---------|
-| **Gemini 2.0 Flash** | Google | ✅ 原生 | 最快，免费 | ✅ |
-| **GPT-4o** | OpenAI | 🔄 帧+音频 | 强大理解 | 🚧 |
-| **Claude 3.5 Sonnet** | Anthropic | 🔄 帧+音频 | 细致分析 | 🚧 |
-| **Qwen2-VL** | 阿里 | ✅ 原生 | 中文优化 | 🚧 |
-
-## 📋 已实现功能清单
-
-### ✅ P0 - 核心功能（已完成）
-- [x] 智能分段 + 时间轴
-- [x] 会议纪要生成（Markdown）
-- [x] 待办事项提取
-- [x] Web 界面
-
-### ✅ P1 - 重要功能（已完成）
-- [x] 发言人识别
-- [x] 决策点标注
-- [x] PDF 导出
-
-### ✅ P2 - 增强功能（已完成）
-- [x] 知识库数据库
-- [x] 历史会议搜索
-- [x] 统计报告
-
-### 🚧 P3 - 未来功能
-- [ ] 情感分析
-- [ ] 关键词云图
-- [ ] 思维导图生成
-- [ ] 智能问答
-- [ ] 趋势分析
-
-## 💡 使用场景
-
-**企业团队**：
-- 📊 周会/月会分析
-- 🎯 项目讨论总结
-- 📝 客户会议纪要
-- 🔍 历史决策回顾
-
-**教育培训**：
-- 📚 课程内容提取
-- 🎓 培训总结
-- 📖 知识点整理
-
-**个人使用**：
-- 📹 视频内容总结
-- 📝 笔记整理
-- 🔖 重点标记
-
-## 🔧 技术架构
-
-```
+```text
 videos-agents/
-├── web/                    # Web 应用
-│   ├── app.py             # Flask 后端
-│   └── templates/
-│       └── index.html     # 前端界面
-├── analyzers/              # 多模型分析器
-│   ├── gemini_analyzer.py
-│   ├── gpt4o_analyzer.py
-│   ├── claude_analyzer.py
-│   └── qwen_analyzer.py
-├── processors/             # 视频处理器
-│   ├── segmenter.py       # 智能分段
+├── web/                         # Flask Web 应用
+│   ├── app.py
+│   └── templates/index.html
+├── processors/
+│   ├── audio_transcriber.py     # 音频提取与 OpenAI 转录
+│   ├── structured_transcript.py # 基于文本的结构化分析
+│   ├── meeting_insights.py      # 老板要求/员工汇报/风险/下一步
+│   ├── task_tracker.py          # 跨会议任务进展识别
+│   ├── segmenter.py
 │   ├── action_item_extractor.py
 │   ├── speaker_diarizer.py
 │   └── decision_detector.py
-├── exporters/              # 导出器
+├── exporters/
 │   ├── markdown_exporter.py
 │   └── pdf_exporter.py
-├── knowledge/              # 知识库
-│   ├── database.py        # SQLite 数据库
-│   └── search.py          # 搜索引擎
-├── timeline_report_generator.py
-├── run_web.py             # Web 启动脚本
-├── analyze_complete.py    # 完整分析入口
+├── knowledge/
+│   ├── database.py              # SQLite 数据库与长期记忆层
+│   └── search.py
+├── meeting_pipeline.py          # 统一分析编排
+├── analyze_complete.py
 ├── analyze_meeting_deep.py
-└── compare_models.py
+├── analyze_with_gemini.py
+├── compare_models.py
+├── run_web.py
+└── start_web.sh
 ```
 
-## 📝 API Keys 配置
+## 数据库中目前保存的内容
 
-在 `.env` 文件中配置：
+SQLite 数据库当前会保存：
 
-```bash
-# Gemini (必需)
-GOOGLE_API_KEY=your_key
+- `meetings`：会议主表
+- `segments`：议题分段
+- `action_items`：单次会议待办事项
+- `speakers`：发言人汇总
+- `participants`：参与者与角色
+- `decisions`：决策点
+- `task_memory`：全局任务总表
+- `task_updates`：任务更新历史
+- `requirement_memory`：老板要求库
+- `requirement_updates`：老板要求更新历史
 
-# 以下为可选（用于多模型对比）
-OPENAI_API_KEY=your_key
-ANTHROPIC_API_KEY=your_key
-DASHSCOPE_API_KEY=your_key
-```
+## 适合的使用场景
 
-获取 API Keys：
-- Gemini: https://aistudio.google.com/app/apikey (免费)
-- OpenAI: https://platform.openai.com/api-keys
-- Claude: https://console.anthropic.com/
-- 通义千问: https://dashscope.console.aliyun.com/
+- 老板和团队的日常例会
+- 项目进度汇报
+- 周会 / 月会纪要
+- 持续追踪老板交代的事项
+- 跟踪任务是否在后续会议中推进或完成
 
-## ⚠️ 注意事项
+## 当前已知边界
 
-- 视频文件限制：< 500MB
-- 视频时长建议：< 1小时
-- 完整分析耗时：3-8 分钟
-- 需要稳定的网络连接
-- PDF 导出需要安装 reportlab
+### 1. 任务状态联动是第一版
 
-## 🐛 故障排除
+系统已经能自动识别“推进中 / 已完成 / 阻塞 / 重新打开”，但它仍基于模型理解，不是完全规则化引擎。首次投入真实会议时，建议人工抽查。
 
-### Web 服务端口被占用
-```bash
-# 编辑 run_web.py，修改端口
-app.run(debug=True, host='0.0.0.0', port=8080)  # 改为其他端口
-```
+### 2. 视觉信息利用较少
 
-### PDF 生成失败
-```bash
-pip install reportlab
-```
+当前主链路已经从“视频直分析”切到“音频转录 + 文本分析”，因此它更擅长会议语义提炼，但对屏幕演示内容、视觉画面信息利用较少。
 
-### 视频上传失败
-- 检查文件大小是否超过 500MB
-- 检查视频格式是否支持
-- 确保有足够的磁盘空间
+### 3. Gemini SDK 后续建议迁移
 
-## 📄 License
+当前项目仍在使用 `google.generativeai`，后续建议迁移到 `google.genai`。
 
-MIT
+## 后续适合继续增强的方向
 
-## 🤝 贡献
+1. 任务搜索和筛选
+2. 项目维度聚合
+3. 任务手动修正和审批
+4. 更精细的任务匹配与去重
+5. Gemini SDK 迁移
 
-欢迎提交 Issue 和 Pull Request！
+## 相关说明文档
 
-## 📧 联系方式
+- [PROJECT_UPDATE_2026-03-10.md](/Users/saita/saita/videos-agnets/PROJECT_UPDATE_2026-03-10.md)
 
-- GitHub: https://github.com/DouHaowen/videos-agents
-- Issues: https://github.com/DouHaowen/videos-agents/issues
-
----
-
-**开发完成度**: 100% ✅
-
-所有计划功能已实现：
-- ✅ P0: 智能分段、待办事项、会议纪要、时间轴
-- ✅ P1: 发言人识别、决策点检测、PDF 导出
-- ✅ P2: 知识库、搜索引擎
-- ✅ Web 界面
-- ✅ 多模型对比
