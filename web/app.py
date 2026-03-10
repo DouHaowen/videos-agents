@@ -19,6 +19,12 @@ from timeline_report_generator import TimelineReportGenerator
 
 load_dotenv()
 
+# 设置代理（如果配置了）
+if os.getenv('HTTP_PROXY'):
+    os.environ['http_proxy'] = os.getenv('HTTP_PROXY')
+    os.environ['https_proxy'] = os.getenv('HTTPS_PROXY', os.getenv('HTTP_PROXY'))
+    print(f"✓ 代理已配置: {os.getenv('HTTP_PROXY')}")
+
 
 def create_app():
     """创建 Flask 应用"""
