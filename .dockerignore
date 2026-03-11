@@ -1,0 +1,14 @@
+.git
+.gitignore
+venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+output
+uploads
+logs
+knowledge/meetings.db
+knowledge/test_meetings.db
+web.log

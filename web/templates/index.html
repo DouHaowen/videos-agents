@@ -94,6 +94,22 @@
             gap: 10px;
             margin-top: 16px;
         }
+        .library-box {
+            margin-top: 14px;
+            padding: 14px;
+            border-radius: 18px;
+            background: #f8fafc;
+            border: 1px solid #dbeafe;
+        }
+        .library-select {
+            width: 100%;
+            border: 1px solid #cbd5e1;
+            border-radius: 14px;
+            padding: 12px 14px;
+            font-size: 14px;
+            margin-top: 10px;
+            background: white;
+        }
         .option-btn {
             border: 1px solid #cbd5e1;
             border-radius: 16px;
@@ -372,6 +388,14 @@
                         <div class="mini-title" id="fileName"></div>
                         <div class="muted" id="fileSize"></div>
                     </div>
+                    <div class="library-box">
+                        <div class="mini-title">服务器视频库</div>
+                        <div class="muted" style="font-size: 13px;">直接使用服务器已有会议视频，优先显示原始文件名，不再重复上传。</div>
+                        <select id="librarySelect" class="library-select">
+                            <option value="">请选择服务器中的现有视频</option>
+                        </select>
+                        <div class="muted" id="libraryMeta" style="font-size: 12px; margin-top: 8px;"></div>
+                    </div>
                     <div class="option-row" style="grid-template-columns: 1fr;">
                         <button class="option-btn selected" data-type="complete">
                             <strong>完整分析</strong>
@@ -497,6 +521,7 @@
 
     <script>
         let selectedFile = null;
+        let selectedLibraryFile = null;
         let selectedType = "complete";
         let currentSessionId = null;
         let currentView = "workspace";
@@ -508,10 +533,13 @@
         const progressFill = document.getElementById("progressFill");
         const progressText = document.getElementById("progressText");
         const historyList = document.getElementById("historyList");
+        const librarySelect = document.getElementById("librarySelect");
+        const libraryMeta = document.getElementById("libraryMeta");
         let memoryCache = { tasks: [], requirements: [], stats: {} };
 
         uploadArea.addEventListener("click", () => fileInput.click());
         fileInput.addEventListener("change", (event) => handleFile(event.target.files[0]));
+        librarySelect.addEventListener("change", handleLibrarySelection);
         uploadArea.addEventListener("dragover", (event) => {
             event.preventDefault();
             uploadArea.classList.add("dragover");
@@ -538,20 +566,27 @@
         document.getElementById("deleteCurrentBtn").addEventListener("click", () => deleteHistory(currentSessionId));
 
         analyzeBtn.addEventListener("click", async () => {
-            if (!selectedFile) return;
+            if (!selectedFile && !selectedLibraryFile) return;
 
             analyzeBtn.disabled = true;
             progress.classList.add("show");
 
             try {
-                progressText.textContent = "正在上传视频...";
-                progressFill.style.width = "22%";
+                let filepath = selectedLibraryFile?.filepath;
+                if (selectedFile) {
+                    progressText.textContent = "正在上传视频...";
+                    progressFill.style.width = "22%";
 
-                const formData = new FormData();
-                formData.append("video", selectedFile);
-                const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
-                const uploadData = await uploadRes.json();
-                if (!uploadData.success) throw new Error(uploadData.error || "上传失败");
+                    const formData = new FormData();
+                    formData.append("video", selectedFile);
+                    const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+                    const uploadData = await uploadRes.json();
+                    if (!uploadData.success) throw new Error(uploadData.error || "上传失败");
+                    filepath = uploadData.filepath;
+                } else {
+                    progressText.textContent = "正在读取服务器视频...";
+                    progressFill.style.width = "22%";
+                }
 
                 progressText.textContent = "正在执行会议分析，这一步可能需要几分钟...";
                 progressFill.style.width = "70%";
@@ -560,7 +595,7 @@
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        filepath: uploadData.filepath,
+                        filepath,
                         type: selectedType,
                         save_to_db: true
                     })
@@ -585,9 +620,62 @@
         function handleFile(file) {
             if (!file) return;
             selectedFile = file;
+            selectedLibraryFile = null;
+            librarySelect.value = "";
+            libraryMeta.textContent = "";
             document.getElementById("fileInfo").style.display = "block";
             document.getElementById("fileName").textContent = file.name;
             document.getElementById("fileSize").textContent = `大小: ${(file.size / 1024 / 1024).toFixed(2)} MB`;
+        }
+
+        function handleLibrarySelection() {
+            const option = librarySelect.selectedOptions[0];
+            const filepath = option?.dataset?.filepath;
+            if (!filepath) {
+                selectedLibraryFile = null;
+                libraryMeta.textContent = "";
+                return;
+            }
+
+            selectedLibraryFile = {
+                filepath,
+                name: option.dataset.name,
+                storedName: option.dataset.storedName || "",
+                size: Number(option.dataset.size || 0),
+                modifiedAt: option.dataset.modifiedAt || ""
+            };
+            selectedFile = null;
+            fileInput.value = "";
+            document.getElementById("fileInfo").style.display = "block";
+            document.getElementById("fileName").textContent = selectedLibraryFile.name;
+            document.getElementById("fileSize").textContent = `服务器文件 · 大小: ${(selectedLibraryFile.size / 1024 / 1024).toFixed(2)} MB`;
+            libraryMeta.textContent = `存储文件名: ${selectedLibraryFile.storedName || selectedLibraryFile.name} · 修改时间: ${selectedLibraryFile.modifiedAt}`;
+        }
+
+        async function loadLibraryVideos() {
+            const res = await fetch("/api/library/videos");
+            const data = await res.json();
+            const items = data.items || [];
+
+            librarySelect.innerHTML = `<option value="">请选择服务器中的现有视频</option>` +
+                items.map((item) => `
+                    <option
+                        value="${escapeHtml(item.filepath)}"
+                        data-filepath="${escapeHtml(item.filepath)}"
+                        data-name="${escapeHtml(item.display_name || item.original_name || item.name)}"
+                        data-stored-name="${escapeHtml(item.name)}"
+                        data-size="${item.size}"
+                        data-modified-at="${escapeHtml(item.modified_at)}"
+                    >
+                        ${escapeHtml(item.display_name || item.original_name || item.name)} (${(item.size / 1024 / 1024).toFixed(1)} MB)
+                    </option>
+                `).join("");
+
+            if (!items.length) {
+                libraryMeta.textContent = "服务器视频库当前没有可用视频。";
+                return;
+            }
+            libraryMeta.textContent = `已加载 ${items.length} 个服务器视频`;
         }
 
         async function loadHistory() {
@@ -936,6 +1024,7 @@
 
         loadMemory();
         loadHistory();
+        loadLibraryVideos();
     </script>
 </body>
 </html>

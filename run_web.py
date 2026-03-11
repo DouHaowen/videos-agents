@@ -13,9 +13,11 @@ from web.app import create_app
 
 if __name__ == '__main__':
     app = create_app()
+    debug_mode = os.getenv("WEB_DEBUG", "").lower() in {"1", "true", "yes"}
+    port_env = os.getenv("PORT")
     
-    # 尝试多个端口
-    ports = [8080, 8081, 8082, 5001, 5002, 9000]
+    # 优先使用环境变量指定端口，否则尝试多个常用端口
+    ports = [int(port_env)] if port_env else [8080, 8081, 8082, 5001, 5002, 9000]
     port = None
     
     for p in ports:
@@ -42,4 +44,9 @@ if __name__ == '__main__':
     print("\n💡 提示: 首次使用请确保已配置 .env 文件中的 GOOGLE_API_KEY")
     print("\n按 Ctrl+C 停止服务器\n")
     
-    app.run(debug=True, host='0.0.0.0', port=port)
+    app.run(
+        debug=debug_mode,
+        use_reloader=False,
+        host='0.0.0.0',
+        port=port,
+    )

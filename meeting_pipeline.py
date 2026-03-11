@@ -34,7 +34,18 @@ class MeetingAnalysisPipeline:
     def __init__(self):
         genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
         self.model = genai.GenerativeModel("gemini-2.0-flash")
-        self.transcriber = AudioTranscriber(os.getenv("OPENAI_API_KEY"))
+        self.transcriber = AudioTranscriber(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            whisper_base_url=os.getenv("WHISPER_API_BASE"),
+            whisper_api_token=os.getenv("WHISPER_API_TOKEN"),
+            tunnel_config={
+                "host": os.getenv("WHISPER_SSH_HOST"),
+                "port": os.getenv("WHISPER_SSH_PORT", "22"),
+                "user": os.getenv("WHISPER_SSH_USER"),
+                "local_port": os.getenv("WHISPER_LOCAL_PORT", "8711"),
+                "remote_port": os.getenv("WHISPER_REMOTE_PORT", "8711"),
+            },
+        )
 
     def analyze(
         self,

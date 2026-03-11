@@ -1,0 +1,23 @@
+services:
+  meeting-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: meeting-video-system
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - .env
+    environment:
+      WEB_DEBUG: "0"
+      PORT: "18080"
+      WHISPER_API_BASE: "http://127.0.0.1:8711"
+      VIDEO_LIBRARY_ROOT: "/home/saita/ihouse-data-sharing/backend/data/uploads"
+      VIDEO_LIBRARY_DB: "/home/saita/ihouse-data-sharing/backend/data/app.db"
+      UPLOAD_FOLDER: "/home/saita/ihouse-data-sharing/backend/data/uploads"
+    volumes:
+      - ./output:/app/output
+      - ./knowledge:/app/knowledge
+      - ./logs:/app/logs
+      - /home/saita/ihouse-data-sharing/backend/data/uploads:/home/saita/ihouse-data-sharing/backend/data/uploads
+      - /home/saita/ihouse-data-sharing/backend/data/app.db:/home/saita/ihouse-data-sharing/backend/data/app.db:ro

@@ -6,11 +6,16 @@
 import json
 import math
 import os
+import socket
+import subprocess
+import time
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
+from urllib.parse import urlparse
 
 from moviepy import VideoFileClip
 from openai import OpenAI
+import requests
 
 
 class AudioTranscriber:
@@ -19,10 +24,20 @@ class AudioTranscriber:
     MAX_AUDIO_FILE_SIZE = 24 * 1024 * 1024
     DEFAULT_CHUNK_SECONDS = 20 * 60
 
-    def __init__(self, api_key: str):
-        if not api_key:
-            raise ValueError("未配置 OPENAI_API_KEY")
-        self.client = OpenAI(api_key=api_key)
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        whisper_base_url: Optional[str] = None,
+        whisper_api_token: Optional[str] = None,
+        tunnel_config: Optional[Dict] = None,
+    ):
+        self.client = OpenAI(api_key=api_key) if api_key else None
+        self.whisper_base_url = (whisper_base_url or "").rstrip("/")
+        self.whisper_api_token = whisper_api_token
+        self.tunnel_config = tunnel_config or {}
+
+        if not self.client and not self.whisper_base_url:
+            raise ValueError("未配置可用转录能力，请设置 OPENAI_API_KEY 或 WHISPER_API_BASE")
 
     def transcribe_video(self, video_path: str, output_dir: Path) -> Dict:
         output_dir = Path(output_dir)
@@ -129,6 +144,20 @@ class AudioTranscriber:
         return max(5 * 60, min(self.DEFAULT_CHUNK_SECONDS, estimated))
 
     def _transcribe_file(self, file_path: Path) -> Dict:
+        if self.whisper_base_url:
+            try:
+                self._ensure_local_whisper_ready()
+                return self._transcribe_with_local_whisper(file_path)
+            except Exception:
+                if not self.client:
+                    raise
+
+        if not self.client:
+            raise ValueError("本地 Whisper 不可用，且未配置 OPENAI_API_KEY")
+
+        return self._transcribe_with_openai(file_path)
+
+    def _transcribe_with_openai(self, file_path: Path) -> Dict:
         with open(file_path, "rb") as audio_file:
             response = self.client.audio.transcriptions.create(
                 file=audio_file,
@@ -143,6 +172,79 @@ class AudioTranscriber:
         if isinstance(response, str):
             return json.loads(response)
         return dict(response)
+
+    def _transcribe_with_local_whisper(self, file_path: Path) -> Dict:
+        with open(file_path, "rb") as audio_file:
+            response = requests.post(
+                f"{self.whisper_base_url}/transcribe",
+                files={"file": (file_path.name, audio_file, "audio/mpeg")},
+                data={"language": "zh", "task": "transcribe"},
+                headers=self._build_whisper_headers(),
+                timeout=60 * 60,
+            )
+        response.raise_for_status()
+        payload = response.json()
+        return {
+            "text": payload.get("text", ""),
+            "segments": payload.get("segments", []),
+            "usage": None,
+            "duration": payload.get("duration"),
+            "model": payload.get("model"),
+        }
+
+    def _ensure_local_whisper_ready(self):
+        if self._local_whisper_healthy():
+            return
+        self._start_ssh_tunnel_if_needed()
+
+        for _ in range(30):
+            if self._local_whisper_healthy():
+                return
+            time.sleep(1)
+
+        raise RuntimeError("本地 Whisper 服务不可用")
+
+    def _local_whisper_healthy(self) -> bool:
+        health_url = f"{self.whisper_base_url}/health"
+        try:
+            response = requests.get(health_url, headers=self._build_whisper_headers(), timeout=3)
+            return response.ok
+        except requests.RequestException:
+            return False
+
+    def _start_ssh_tunnel_if_needed(self):
+        if not self.tunnel_config.get("host") or not self.tunnel_config.get("user"):
+            return
+
+        parsed = urlparse(self.whisper_base_url)
+        local_host = parsed.hostname or "127.0.0.1"
+        local_port = parsed.port or self.tunnel_config.get("local_port") or 8711
+        remote_port = self.tunnel_config.get("remote_port") or local_port
+
+        if self._is_port_open(local_host, local_port):
+            return
+
+        command = [
+            "ssh",
+            "-f",
+            "-N",
+            "-L",
+            f"{local_host}:{local_port}:127.0.0.1:{remote_port}",
+            "-p",
+            str(self.tunnel_config.get("port", 22)),
+            f"{self.tunnel_config['user']}@{self.tunnel_config['host']}",
+        ]
+        subprocess.run(command, check=False, capture_output=True)
+
+    def _is_port_open(self, host: str, port: int) -> bool:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(1)
+            return sock.connect_ex((host, port)) == 0
+
+    def _build_whisper_headers(self) -> Dict[str, str]:
+        if not self.whisper_api_token:
+            return {}
+        return {"Authorization": f"Bearer {self.whisper_api_token}"}
 
     def _format_time(self, seconds: float) -> str:
         total_seconds = max(0, int(seconds))

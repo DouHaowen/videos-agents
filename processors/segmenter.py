@@ -4,6 +4,7 @@
 """
 
 import json
+import re
 from datetime import timedelta
 from typing import Dict, List
 
@@ -171,12 +172,33 @@ class MeetingSegmenter:
         if isinstance(time_value, (int, float)):
             return float(time_value)
 
-        parts = [int(part) for part in str(time_value).split(":")]
-        if len(parts) == 2:
-            minutes, seconds = parts
+        raw_value = str(time_value or "").strip()
+        if not raw_value:
+            return 0.0
+
+        raw_value = raw_value.strip("[]()")
+        raw_value = raw_value.replace("：", ":")
+
+        if re.fullmatch(r"\d{1,2}-\d{1,2}", raw_value):
+            raw_value = raw_value.replace("-", ":")
+
+        if "-" in raw_value and ":" in raw_value:
+            raw_value = raw_value.split("-", 1)[0].strip()
+
+        parts = [part.strip() for part in raw_value.split(":") if part.strip()]
+        if not parts:
+            return 0.0
+
+        try:
+            values = [int(part) for part in parts]
+        except ValueError:
+            return 0.0
+
+        if len(values) == 2:
+            minutes, seconds = values
             return minutes * 60 + seconds
-        if len(parts) == 3:
-            hours, minutes, seconds = parts
+        if len(values) == 3:
+            hours, minutes, seconds = values
             return hours * 3600 + minutes * 60 + seconds
         return 0.0
 

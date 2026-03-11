@@ -8,6 +8,7 @@ import os
 import shutil
 from datetime import datetime
 from pathlib import Path
+import sqlite3
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request, send_file
@@ -27,8 +28,14 @@ def create_app():
     app = Flask(__name__)
     app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
     project_root = Path(__file__).resolve().parent.parent
-    app.config["UPLOAD_FOLDER"] = project_root / "uploads"
-    app.config["OUTPUT_FOLDER"] = project_root / "output"
+    app.config["UPLOAD_FOLDER"] = Path(os.getenv("UPLOAD_FOLDER", str(project_root / "uploads"))).resolve()
+    app.config["OUTPUT_FOLDER"] = Path(os.getenv("OUTPUT_FOLDER", str(project_root / "output"))).resolve()
+    app.config["VIDEO_LIBRARY_ROOT"] = Path(
+        os.getenv("VIDEO_LIBRARY_ROOT", str(app.config["UPLOAD_FOLDER"]))
+    ).resolve()
+    app.config["VIDEO_LIBRARY_DB"] = Path(
+        os.getenv("VIDEO_LIBRARY_DB", str(project_root / "knowledge" / "meetings.db"))
+    ).resolve()
     app.config["UPLOAD_FOLDER"].mkdir(exist_ok=True)
     app.config["OUTPUT_FOLDER"].mkdir(exist_ok=True)
 
@@ -157,10 +164,64 @@ def create_app():
         return jsonify(
             {
                 "success": True,
-            "filename": safe_filename,
-            "filepath": str(filepath),
+                "filename": safe_filename,
+                "filepath": str(filepath),
             }
         )
+
+    @app.route("/api/library/videos")
+    def list_library_videos():
+        library_root = app.config["VIDEO_LIBRARY_ROOT"]
+        if not library_root.exists() or not library_root.is_dir():
+            return jsonify({"items": [], "root": str(library_root)})
+
+        name_map = {}
+        metadata_db = app.config["VIDEO_LIBRARY_DB"]
+        if metadata_db.exists():
+            conn = sqlite3.connect(metadata_db)
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    """
+                    SELECT saved_name, display_name, original_name, owner_name, project_name, created_at
+                    FROM stored_files
+                    """
+                )
+                for saved_name, display_name, original_name, owner_name, project_name, created_at in cur.fetchall():
+                    name_map[saved_name] = {
+                        "display_name": display_name or original_name or saved_name,
+                        "original_name": original_name or display_name or saved_name,
+                        "owner_name": owner_name or "",
+                        "project_name": project_name or "",
+                        "created_at": created_at or "",
+                    }
+            finally:
+                conn.close()
+
+        items = []
+        for path in sorted(library_root.iterdir(), reverse=True):
+            if not path.is_file():
+                continue
+            if path.suffix.lower() not in {".mp4", ".mov", ".avi", ".mkv", ".m4v"}:
+                continue
+
+            stat = path.stat()
+            metadata = name_map.get(path.name, {})
+            items.append(
+                {
+                    "name": path.name,
+                    "display_name": metadata.get("display_name", path.name),
+                    "original_name": metadata.get("original_name", path.name),
+                    "filepath": str(path.resolve()),
+                    "size": stat.st_size,
+                    "owner_name": metadata.get("owner_name", ""),
+                    "project_name": metadata.get("project_name", ""),
+                    "created_at": metadata.get("created_at", ""),
+                    "modified_at": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
+                }
+            )
+
+        return jsonify({"items": items, "root": str(library_root)})
 
     @app.route("/api/analyze", methods=["POST"])
     def analyze_video():

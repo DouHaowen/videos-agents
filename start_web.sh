@@ -15,7 +15,7 @@ source venv/bin/activate
 
 # 安装依赖
 echo "📥 检查依赖..."
-pip install -q flask google-generativeai python-dotenv opencv-python moviepy reportlab openai 2>/dev/null
+pip install -q flask google-generativeai python-dotenv opencv-python moviepy reportlab openai requests 2>/dev/null
 
 # 检查 .env 文件
 if [ ! -f ".env" ]; then
