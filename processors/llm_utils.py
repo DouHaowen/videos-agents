@@ -18,10 +18,26 @@ def parse_json_response(text: str):
     elif "```" in cleaned:
         cleaned = cleaned.split("```", 1)[1].split("```", 1)[0].strip()
 
-    start = cleaned.find("{")
-    end = cleaned.rfind("}")
-    if start != -1 and end != -1 and end >= start:
-        cleaned = cleaned[start:end + 1]
+    decoder = json.JSONDecoder()
+
+    for opener, closer in (("{", "}"), ("[", "]")):
+        start = cleaned.find(opener)
+        if start == -1:
+            continue
+
+        candidate = cleaned[start:]
+        try:
+            parsed, _ = decoder.raw_decode(candidate)
+            return parsed
+        except json.JSONDecodeError:
+            end = cleaned.rfind(closer)
+            if end != -1 and end >= start:
+                snippet = cleaned[start:end + 1]
+                try:
+                    parsed, _ = decoder.raw_decode(snippet)
+                    return parsed
+                except json.JSONDecodeError:
+                    continue
 
     return json.loads(cleaned)
 

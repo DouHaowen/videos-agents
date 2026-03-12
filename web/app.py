@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request, send_file
 from werkzeug.utils import secure_filename
 
+from llm_client import get_available_models
 from meeting_pipeline import MeetingAnalysisPipeline
 from knowledge.database import MeetingDatabase
 
@@ -144,7 +145,7 @@ def create_app():
 
     @app.route("/")
     def index():
-        return render_template("index.html")
+        return render_template("index.html", available_models=get_available_models())
 
     @app.route("/api/upload", methods=["POST"])
     def upload_video():
@@ -228,6 +229,7 @@ def create_app():
         data = request.json or {}
         filepath = data.get("filepath")
         save_to_db = data.get("save_to_db", True)
+        analysis_model = data.get("analysis_model") or os.getenv("DEFAULT_ANALYSIS_MODEL", "gemini")
 
         if not filepath or not Path(filepath).exists():
             return jsonify({"error": "文件不存在"}), 400
@@ -238,10 +240,15 @@ def create_app():
                 output_root=str(app.config["OUTPUT_FOLDER"]),
                 mode="complete",
                 save_to_db=save_to_db,
+                analysis_model=analysis_model,
             )
             return jsonify(result)
         except Exception as exc:
             return jsonify({"error": str(exc)}), 500
+
+    @app.route("/api/models")
+    def available_models():
+        return jsonify({"items": get_available_models()})
 
     @app.route("/api/results/<session_id>")
     def get_results(session_id):
@@ -303,12 +310,23 @@ def create_app():
             "speakers": "speaker_report.md",
             "decisions": "decision_report.md",
             "structured": "structured_transcript.json",
+            "transcript": "full_transcript.txt",
         }
         filename = file_map.get(file_type)
         if not filename:
             return jsonify({"error": "不支持的文件类型"}), 400
 
         filepath = (session_dir / filename).resolve()
+        if file_type == "transcript" and not filepath.exists():
+            transcription_path = (session_dir / "transcription.json").resolve()
+            if transcription_path.exists():
+                with open(transcription_path, "r", encoding="utf-8") as file:
+                    transcription = json.load(file)
+                content = (transcription.get("raw_text") or transcription.get("transcript") or "").strip()
+                if content:
+                    with open(filepath, "w", encoding="utf-8") as file:
+                        file.write(content + "\n")
+
         if not filepath.exists():
             return jsonify({"error": "文件不存在"}), 404
 

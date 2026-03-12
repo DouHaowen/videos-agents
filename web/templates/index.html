@@ -396,6 +396,16 @@
                         </select>
                         <div class="muted" id="libraryMeta" style="font-size: 12px; margin-top: 8px;"></div>
                     </div>
+                    <div class="library-box">
+                        <div class="mini-title">分析模型</div>
+                        <div class="muted" style="font-size: 13px;">Whisper 转录保持不变，这里只决定后续文本分析和总结用哪个大模型。</div>
+                        <select id="modelSelect" class="library-select">
+                            {% for model in available_models %}
+                            <option value="{{ model.id }}">{{ model.label }} · {{ model.provider }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="muted" id="modelMeta" style="font-size: 12px; margin-top: 8px;">当前默认使用 Gemini 3 Flash Preview</div>
+                    </div>
                     <div class="option-row" style="grid-template-columns: 1fr;">
                         <button class="option-btn selected" data-type="complete">
                             <strong>完整分析</strong>
@@ -426,6 +436,7 @@
                     <div class="actions">
                         <button class="secondary-btn" id="downloadMarkdownBtn">下载纪要</button>
                         <button class="secondary-btn" id="downloadPdfBtn">下载 PDF</button>
+                        <button class="secondary-btn" id="downloadTranscriptBtn">下载全文转录</button>
                         <button class="secondary-btn" id="downloadStructuredBtn">下载结构化转录</button>
                         <button class="ghost-btn" id="deleteCurrentBtn">删除当前历史</button>
                     </div>
@@ -523,6 +534,7 @@
         let selectedFile = null;
         let selectedLibraryFile = null;
         let selectedType = "complete";
+        let selectedModel = "gemini";
         let currentSessionId = null;
         let currentView = "workspace";
 
@@ -535,11 +547,14 @@
         const historyList = document.getElementById("historyList");
         const librarySelect = document.getElementById("librarySelect");
         const libraryMeta = document.getElementById("libraryMeta");
+        const modelSelect = document.getElementById("modelSelect");
+        const modelMeta = document.getElementById("modelMeta");
         let memoryCache = { tasks: [], requirements: [], stats: {} };
 
         uploadArea.addEventListener("click", () => fileInput.click());
         fileInput.addEventListener("change", (event) => handleFile(event.target.files[0]));
         librarySelect.addEventListener("change", handleLibrarySelection);
+        modelSelect.addEventListener("change", handleModelSelection);
         uploadArea.addEventListener("dragover", (event) => {
             event.preventDefault();
             uploadArea.classList.add("dragover");
@@ -562,6 +577,7 @@
         document.getElementById("refreshMemoryBtn").addEventListener("click", loadMemory);
         document.getElementById("downloadMarkdownBtn").addEventListener("click", () => downloadCurrent("markdown"));
         document.getElementById("downloadPdfBtn").addEventListener("click", () => downloadCurrent("pdf"));
+        document.getElementById("downloadTranscriptBtn").addEventListener("click", () => downloadCurrent("transcript"));
         document.getElementById("downloadStructuredBtn").addEventListener("click", () => downloadCurrent("structured"));
         document.getElementById("deleteCurrentBtn").addEventListener("click", () => deleteHistory(currentSessionId));
 
@@ -597,6 +613,7 @@
                     body: JSON.stringify({
                         filepath,
                         type: selectedType,
+                        analysis_model: selectedModel,
                         save_to_db: true
                     })
                 });
@@ -650,6 +667,14 @@
             document.getElementById("fileName").textContent = selectedLibraryFile.name;
             document.getElementById("fileSize").textContent = `服务器文件 · 大小: ${(selectedLibraryFile.size / 1024 / 1024).toFixed(2)} MB`;
             libraryMeta.textContent = `存储文件名: ${selectedLibraryFile.storedName || selectedLibraryFile.name} · 修改时间: ${selectedLibraryFile.modifiedAt}`;
+        }
+
+        function handleModelSelection() {
+            selectedModel = modelSelect.value || "gemini";
+            const option = modelSelect.selectedOptions[0];
+            modelMeta.textContent = option
+                ? `本次将使用 ${option.textContent.replace(/\s+/g, " ").trim()} 进行文本分析`
+                : "请选择分析模型";
         }
 
         async function loadLibraryVideos() {
@@ -742,6 +767,7 @@
             document.getElementById("resultSummary").textContent = basic.summary || "无摘要";
             document.getElementById("resultMeta").innerHTML = `
                 <div class="pill">分类: ${escapeHtml(basic.category || "未分类")}</div>
+                <div class="pill">分析模型: ${escapeHtml((basic.analysis_model || {}).label || (data.analysis_model || {}).label || "Gemini 3 Flash Preview")}</div>
                 <div class="pill">议题数: ${(data.segments || []).length}</div>
                 <div class="pill">待办事项: ${(data.action_items || []).length}</div>
                 <div class="pill">发言人: ${(data.speakers || []).length}</div>
@@ -1025,6 +1051,7 @@
         loadMemory();
         loadHistory();
         loadLibraryVideos();
+        handleModelSelection();
     </script>
 </body>
 </html>

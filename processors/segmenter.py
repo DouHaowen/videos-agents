@@ -8,8 +8,7 @@ import re
 from datetime import timedelta
 from typing import Dict, List
 
-import google.generativeai as genai
-
+from llm_client import GenerationConfig
 from .llm_utils import parse_json_response
 
 
@@ -55,7 +54,7 @@ class MeetingSegmenter:
 
         response = self.client.generate_content(
             prompt,
-            generation_config=genai.GenerationConfig(
+            generation_config=GenerationConfig(
                 temperature=0.2,
                 response_mime_type="application/json",
             ),

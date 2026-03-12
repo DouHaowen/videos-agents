@@ -1,4 +1,4 @@
-/Users/saita/saita/videos-agnets/web/app.py:12: FutureWarning: 
+/Users/saita/saita/videos-agnets/meeting_pipeline.py:13: FutureWarning: 
 
 All support for the `google.generativeai` package has ended. It will no longer be receiving 
 updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
@@ -7,39 +7,27 @@ See README for more details:
 https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
 
   import google.generativeai as genai
-✓ 代理已配置: http://127.0.0.1:55615
 
 ============================================================
 🌐 会议视频分析系统 Web 版
 ============================================================
 
-📍 本地访问: http://localhost:5001
-📍 局域网访问: http://你的IP:5001
+📍 本地访问: http://localhost:8080
+📍 局域网访问: http://你的IP:8080
 
 💡 提示: 首次使用请确保已配置 .env 文件中的 GOOGLE_API_KEY
 
 按 Ctrl+C 停止服务器
 
  * Serving Flask app 'web.app'
- * Debug mode: on
+ * Debug mode: off
 [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on all addresses (0.0.0.0)
- * Running on http://127.0.0.1:5001
- * Running on http://127.0.0.1:5001
+ * Running on http://127.0.0.1:8080
+ * Running on http://192.168.0.21:8080
 [33mPress CTRL+C to quit[0m
- * Restarting with stat
-/Users/saita/saita/videos-agnets/web/app.py:12: FutureWarning: 
-
-All support for the `google.generativeai` package has ended. It will no longer be receiving 
-updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
-See README for more details:
-
-https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
-
-  import google.generativeai as genai
- * Debugger is active!
- * Debugger PIN: 128-275-077
-/opt/miniconda3/lib/python3.13/multiprocessing/resource_tracker.py:400: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown: {'/mp-drosra7i'}
-  warnings.warn(
-/opt/miniconda3/lib/python3.13/multiprocessing/resource_tracker.py:400: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown: {'/mp-m39cng37'}
-  warnings.warn(
+127.0.0.1 - - [11/Mar/2026 12:31:30] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [11/Mar/2026 12:31:32] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [11/Mar/2026 12:31:34] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [11/Mar/2026 12:31:36] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [11/Mar/2026 12:31:38] "GET / HTTP/1.1" 200 -

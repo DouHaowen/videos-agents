@@ -10,11 +10,11 @@ from pathlib import Path
 from typing import Dict
 
 import cv2
-import google.generativeai as genai
 from dotenv import load_dotenv
 
 from exporters.markdown_exporter import MarkdownExporter
 from knowledge.database import MeetingDatabase
+from llm_client import build_llm_client
 from processors.action_item_extractor import ActionItemExtractor
 from processors.audio_transcriber import AudioTranscriber
 from processors.decision_detector import DecisionDetector
@@ -32,8 +32,6 @@ class MeetingAnalysisPipeline:
     """统一会议分析编排器。"""
 
     def __init__(self):
-        genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-        self.model = genai.GenerativeModel("gemini-2.0-flash")
         self.transcriber = AudioTranscriber(
             api_key=os.getenv("OPENAI_API_KEY"),
             whisper_base_url=os.getenv("WHISPER_API_BASE"),
@@ -53,6 +51,7 @@ class MeetingAnalysisPipeline:
         output_root: str = "output",
         mode: str = "complete",
         save_to_db: bool = False,
+        analysis_model: str = None,
     ) -> Dict:
         output_dir = Path(output_root)
         output_dir.mkdir(exist_ok=True)
@@ -65,13 +64,18 @@ class MeetingAnalysisPipeline:
         session_id = f"{session_prefix}_{timestamp}"
         session_dir = output_dir / session_id
         session_dir.mkdir(exist_ok=True)
+        llm_client, model_info = build_llm_client(analysis_model)
 
         video_duration = self._get_video_duration(video_path)
 
         transcription = self.transcriber.transcribe_video(video_path, session_dir)
         self._write_json(session_dir / "transcription.json", transcription)
+        full_transcript_text = (transcription.get("raw_text") or transcription.get("transcript") or "").strip()
+        if full_transcript_text:
+            with open(session_dir / "full_transcript.txt", "w", encoding="utf-8") as file:
+                file.write(full_transcript_text + "\n")
 
-        structured = StructuredTranscriptProcessor(self.model).analyze_transcript(
+        structured = StructuredTranscriptProcessor(llm_client).analyze_transcript(
             transcription.get("transcript", ""),
             transcription.get("utterances", []),
         )
@@ -79,7 +83,7 @@ class MeetingAnalysisPipeline:
         utterances = structured.get("utterances", [])
         participants = structured.get("participants", [])
 
-        insights = MeetingInsightExtractor(self.model).extract(transcript, participants, utterances)
+        insights = MeetingInsightExtractor(llm_client).extract(transcript, participants, utterances)
         participant_roles = insights.get("participant_roles", participants)
 
         speaker_map = {item.get("speaker_id"): item for item in participant_roles if item.get("speaker_id")}
@@ -93,6 +97,7 @@ class MeetingAnalysisPipeline:
             "summary": structured.get("summary", ""),
             "key_points": structured.get("key_points", []),
             "category": structured.get("category", "工作"),
+            "analysis_model": model_info,
             "transcript": transcript,
             "participants": participant_roles,
             "manager_summary": {
@@ -113,15 +118,15 @@ class MeetingAnalysisPipeline:
         )
         self._write_json(session_dir / "participant_roles.json", participant_roles)
 
-        segmenter = MeetingSegmenter(self.model)
+        segmenter = MeetingSegmenter(llm_client)
         segments = segmenter.segment_meeting(transcript, video_duration, utterances=utterances)
         self._write_json(session_dir / "segments.json", segments)
 
-        extractor = ActionItemExtractor(self.model)
+        extractor = ActionItemExtractor(llm_client)
         action_items = extractor.extract_action_items(transcript, segments, utterances=utterances)
         self._write_json(session_dir / "action_items.json", action_items)
 
-        diarizer = SpeakerDiarizer(self.model)
+        diarizer = SpeakerDiarizer(llm_client)
         speakers = diarizer.identify_speakers(
             transcript,
             segments,
@@ -132,7 +137,7 @@ class MeetingAnalysisPipeline:
         with open(session_dir / "speaker_report.md", "w", encoding="utf-8") as file:
             file.write(diarizer.generate_speaker_report(speakers))
 
-        detector = DecisionDetector(self.model)
+        detector = DecisionDetector(llm_client)
         decisions = detector.detect_decisions(transcript, segments, utterances=utterances)
         self._write_json(session_dir / "decisions.json", decisions)
         with open(session_dir / "decision_report.md", "w", encoding="utf-8") as file:
@@ -204,7 +209,7 @@ class MeetingAnalysisPipeline:
                     analysis=basic_analysis,
                     action_items=action_items,
                 )
-                progress_updates = TaskTracker(self.model).detect_updates(transcript, existing_tasks)
+                progress_updates = TaskTracker(llm_client).detect_updates(transcript, existing_tasks)
                 progress_sync = db.apply_task_progress_updates(meeting_id, progress_updates)
                 memory_sync.update(progress_sync)
                 memory_sync["task_updates_detected"] = len(progress_updates)
@@ -234,6 +239,7 @@ class MeetingAnalysisPipeline:
             "boss_messages_count": len(insights.get("boss_messages", [])),
             "transcript_length": len(transcript),
             "pdf_generated": pdf_generated,
+            "analysis_model": model_info,
             "transcription_usage": transcription.get("usage", []),
             "memory_sync": memory_sync,
         }
@@ -246,6 +252,7 @@ class MeetingAnalysisPipeline:
             "summary": basic_analysis.get("summary"),
             "title": basic_analysis.get("title"),
             "category": basic_analysis.get("category"),
+            "analysis_model": model_info,
             "segments_count": len(segments),
             "action_items_count": len(action_items),
             "speakers_count": len(speakers),
